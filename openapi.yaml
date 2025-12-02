@@ -1,0 +1,491 @@
+# Generated with protoc-gen-openapi
+# https://github.com/google/gnostic/tree/master/cmd/protoc-gen-openapi
+
+openapi: 3.0.3
+info:
+    title: User API
+    version: 0.0.1
+paths:
+    /api/admin_dhb/card_status_handle:
+        get:
+            tags:
+                - User
+            operationId: User_CardStatusHandle
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/CardStatusHandleReply'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /api/admin_dhb/config:
+        get:
+            tags:
+                - User
+            operationId: User_AdminConfig
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/AdminConfigReply'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /api/admin_dhb/config_update:
+        post:
+            tags:
+                - User
+            operationId: User_AdminConfigUpdate
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/AdminConfigUpdateRequest_SendBody'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/AdminConfigUpdateReply'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /api/admin_dhb/deposit:
+        get:
+            tags:
+                - User
+            operationId: User_Deposit
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/DepositReply'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /api/admin_dhb/login:
+        post:
+            tags:
+                - User
+            operationId: User_AdminLogin
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/AdminLoginRequest_SendBody'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/AdminLoginReply'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /api/admin_dhb/open_card_handle:
+        get:
+            tags:
+                - User
+            description: 开卡
+            operationId: User_OpenCardHandle
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/OpenCardHandleReply'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /api/admin_dhb/reward_card_two:
+        get:
+            tags:
+                - User
+            operationId: User_RewardCardTwo
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/RewardCardTwoReply'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /api/admin_dhb/reward_list:
+        get:
+            tags:
+                - User
+            operationId: User_AdminRewardList
+            parameters:
+                - name: page
+                  in: query
+                  schema:
+                    type: string
+                - name: address
+                  in: query
+                  schema:
+                    type: string
+                - name: reason
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/AdminRewardListReply'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /api/admin_dhb/set_can_vip:
+        post:
+            tags:
+                - User
+            operationId: User_UpdateCanVip
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/UpdateCanVipRequest_SendBody'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/UpdateCanVipReply'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /api/admin_dhb/set_user_count:
+        post:
+            tags:
+                - User
+            operationId: User_SetUserCount
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/SetUserCountRequest_SendBody'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/SetUserCountReply'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /api/admin_dhb/set_vip_three:
+        post:
+            tags:
+                - User
+            operationId: User_SetVipThree
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/SetVipThreeRequest_SendBody'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/SetVipThreeReply'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /api/admin_dhb/user_list:
+        get:
+            tags:
+                - User
+            operationId: User_AdminUserList
+            parameters:
+                - name: page
+                  in: query
+                  schema:
+                    type: string
+                - name: address
+                  in: query
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/AdminUserListReply'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+    /api/admin_dhb/withdraw_eth:
+        get:
+            tags:
+                - User
+            operationId: User_AdminWithdrawEth
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/AdminWithdrawEthReply'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+components:
+    schemas:
+        AdminConfigReply:
+            type: object
+            properties:
+                config:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/AdminConfigReply_List'
+                count:
+                    type: string
+        AdminConfigReply_List:
+            type: object
+            properties:
+                id:
+                    type: string
+                name:
+                    type: string
+                value:
+                    type: string
+        AdminConfigUpdateReply:
+            type: object
+            properties: {}
+        AdminConfigUpdateRequest_SendBody:
+            type: object
+            properties:
+                id:
+                    type: string
+                value:
+                    type: string
+        AdminLoginReply:
+            type: object
+            properties:
+                token:
+                    type: string
+        AdminLoginRequest_SendBody:
+            type: object
+            properties:
+                account:
+                    type: string
+                password:
+                    type: string
+        AdminRewardListReply:
+            type: object
+            properties:
+                rewards:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/AdminRewardListReply_List'
+                count:
+                    type: string
+        AdminRewardListReply_List:
+            type: object
+            properties:
+                createdAt:
+                    type: string
+                amount:
+                    type: string
+                address:
+                    type: string
+                reason:
+                    type: string
+                    description: |-
+                        原因 每一条替换文案
+                         实体卡开卡收益reason=11
+                         虚拟卡开卡收益reason=6
+                         划转reason=5
+                         提现reason=2
+                         充值reason=1
+                         开实体卡reason=9
+                         开虚拟卡reason=3
+                         开虚拟卡失败退款reason=7
+                         虚拟卡充值reason=4
+                addressTwo:
+                    type: string
+                one:
+                    type: string
+        AdminUserListReply:
+            type: object
+            properties:
+                users:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/AdminUserListReply_UserList'
+                count:
+                    type: string
+        AdminUserListReply_UserList:
+            type: object
+            properties:
+                userId:
+                    type: string
+                createdAt:
+                    type: string
+                address:
+                    type: string
+                myRecommendAddress:
+                    type: string
+                amount:
+                    type: string
+                myTotalAmount:
+                    type: string
+                vip:
+                    type: string
+                canVip:
+                    type: string
+                vipThree:
+                    type: string
+                historyRecommend:
+                    type: string
+                card:
+                    type: string
+                cardNumber:
+                    type: string
+                cardOrderId:
+                    type: string
+                userCount:
+                    type: string
+                vipTwo:
+                    type: string
+                cardTwo:
+                    type: string
+        AdminWithdrawEthReply:
+            type: object
+            properties: {}
+        CardStatusHandleReply:
+            type: object
+            properties:
+                status:
+                    type: string
+        DepositReply:
+            type: object
+            properties:
+                status:
+                    type: string
+        GoogleProtobufAny:
+            type: object
+            properties:
+                '@type':
+                    type: string
+                    description: The type of the serialized message.
+            additionalProperties: true
+            description: Contains an arbitrary serialized message along with a @type that describes the type of the serialized message.
+        OpenCardHandleReply:
+            type: object
+            properties:
+                status:
+                    type: string
+        RewardCardTwoReply:
+            type: object
+            properties: {}
+        SetUserCountReply:
+            type: object
+            properties: {}
+        SetUserCountRequest_SendBody:
+            type: object
+            properties:
+                userId:
+                    type: string
+        SetVipThreeReply:
+            type: object
+            properties: {}
+        SetVipThreeRequest_SendBody:
+            type: object
+            properties:
+                userId:
+                    type: string
+                vipThree:
+                    type: string
+        Status:
+            type: object
+            properties:
+                code:
+                    type: integer
+                    description: The status code, which should be an enum value of [google.rpc.Code][google.rpc.Code].
+                    format: int32
+                message:
+                    type: string
+                    description: A developer-facing error message, which should be in English. Any user-facing error message should be localized and sent in the [google.rpc.Status.details][google.rpc.Status.details] field, or localized by the client.
+                details:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/GoogleProtobufAny'
+                    description: A list of messages that carry the error details.  There is a common set of message types for APIs to use.
+            description: 'The `Status` type defines a logical error model that is suitable for different programming environments, including REST APIs and RPC APIs. It is used by [gRPC](https://github.com/grpc). Each `Status` message contains three pieces of data: error code, error message, and error details. You can find out more about this error model and how to work with it in the [API Design Guide](https://cloud.google.com/apis/design/errors).'
+        UpdateCanVipReply:
+            type: object
+            properties: {}
+        UpdateCanVipRequest_SendBody:
+            type: object
+            properties:
+                userId:
+                    type: string
+                canVip:
+                    type: string
+tags:
+    - name: User
