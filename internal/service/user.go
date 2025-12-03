@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/go-kratos/kratos/v2/log"
+	transporthttp "github.com/go-kratos/kratos/v2/transport/http"
 	"math/big"
 	"net/http"
 	"strconv"
@@ -317,6 +318,14 @@ func (u *UserService) AdminRewardList(ctx context.Context, req *pb.AdminRewardLi
 
 func (u *UserService) AdminUserList(ctx context.Context, req *pb.AdminUserListRequest) (*pb.AdminUserListReply, error) {
 	return u.uuc.AdminUserList(ctx, req)
+}
+
+func (u *UserService) UpdateUserInfoTo(ctx context.Context, req *pb.UpdateUserInfoToRequest) (*pb.UpdateUserInfoToReply, error) {
+	return nil, nil
+}
+
+func (u *UserService) UpdateUserInfoToKyc(ctx transporthttp.Context) error {
+	return u.uuc.UpdateUserInfoTo(ctx)
 }
 
 func (u *UserService) UpdateCanVip(ctx context.Context, req *pb.UpdateCanVipRequest) (*pb.UpdateCanVipReply, error) {

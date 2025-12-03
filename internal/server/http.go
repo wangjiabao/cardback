@@ -44,6 +44,12 @@ func NewHTTPServer(c *conf.Server, userService *service.UserService, logger log.
 	v1.RegisterUserHTTPServer(srv, userService)
 
 	srv.HandleFunc("/api/admin_dhb/callback", userService.CallBack)
+
+	//路由注册
+	route := srv.Route("/api/admin_dhb")
+	//图片上传
+	route.POST("/upload", userService.UpdateUserInfoToKyc)
+
 	return srv
 }
 

@@ -59,6 +59,13 @@ service User {
 		};
 	};
 
+	rpc UpdateUserInfoTo (UpdateUserInfoToRequest) returns (UpdateUserInfoToReply) {
+		option (google.api.http) = {
+			post: "/api/admin_dhb/set_user_info_to"
+			body: "send_body"
+		};
+	};
+
 	rpc UpdateCanVip (UpdateCanVipRequest) returns (UpdateCanVipReply) {
 		option (google.api.http) = {
 			post: "/api/admin_dhb/set_can_vip"
@@ -154,6 +161,18 @@ message UpdateCanVipRequest {
 
 message UpdateCanVipReply {
 }
+
+message UpdateUserInfoToRequest {
+	message SendBody{
+		uint64 userId = 1;
+	}
+
+	SendBody send_body = 1;
+}
+
+message UpdateUserInfoToReply {
+}
+
 
 message AdminLoginRequest {
 	message SendBody{

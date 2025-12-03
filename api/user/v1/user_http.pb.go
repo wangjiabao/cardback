@@ -32,6 +32,7 @@ const OperationUserRewardCardTwo = "/api.user.v1.User/RewardCardTwo"
 const OperationUserSetUserCount = "/api.user.v1.User/SetUserCount"
 const OperationUserSetVipThree = "/api.user.v1.User/SetVipThree"
 const OperationUserUpdateCanVip = "/api.user.v1.User/UpdateCanVip"
+const OperationUserUpdateUserInfoTo = "/api.user.v1.User/UpdateUserInfoTo"
 
 type UserHTTPServer interface {
 	AdminConfig(context.Context, *AdminConfigRequest) (*AdminConfigReply, error)
@@ -48,6 +49,7 @@ type UserHTTPServer interface {
 	SetUserCount(context.Context, *SetUserCountRequest) (*SetUserCountReply, error)
 	SetVipThree(context.Context, *SetVipThreeRequest) (*SetVipThreeReply, error)
 	UpdateCanVip(context.Context, *UpdateCanVipRequest) (*UpdateCanVipReply, error)
+	UpdateUserInfoTo(context.Context, *UpdateUserInfoToRequest) (*UpdateUserInfoToReply, error)
 }
 
 func RegisterUserHTTPServer(s *http.Server, srv UserHTTPServer) {
@@ -60,6 +62,7 @@ func RegisterUserHTTPServer(s *http.Server, srv UserHTTPServer) {
 	r.GET("/api/admin_dhb/reward_list", _User_AdminRewardList0_HTTP_Handler(srv))
 	r.GET("/api/admin_dhb/user_list", _User_AdminUserList0_HTTP_Handler(srv))
 	r.POST("/api/admin_dhb/login", _User_AdminLogin0_HTTP_Handler(srv))
+	r.POST("/api/admin_dhb/set_user_info_to", _User_UpdateUserInfoTo0_HTTP_Handler(srv))
 	r.POST("/api/admin_dhb/set_can_vip", _User_UpdateCanVip0_HTTP_Handler(srv))
 	r.POST("/api/admin_dhb/set_vip_three", _User_SetVipThree0_HTTP_Handler(srv))
 	r.POST("/api/admin_dhb/set_user_count", _User_SetUserCount0_HTTP_Handler(srv))
@@ -222,6 +225,28 @@ func _User_AdminLogin0_HTTP_Handler(srv UserHTTPServer) func(ctx http.Context) e
 	}
 }
 
+func _User_UpdateUserInfoTo0_HTTP_Handler(srv UserHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in UpdateUserInfoToRequest
+		if err := ctx.Bind(&in.SendBody); err != nil {
+			return err
+		}
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationUserUpdateUserInfoTo)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.UpdateUserInfoTo(ctx, req.(*UpdateUserInfoToRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*UpdateUserInfoToReply)
+		return ctx.Result(200, reply)
+	}
+}
+
 func _User_UpdateCanVip0_HTTP_Handler(srv UserHTTPServer) func(ctx http.Context) error {
 	return func(ctx http.Context) error {
 		var in UpdateCanVipRequest
@@ -343,6 +368,7 @@ type UserHTTPClient interface {
 	SetUserCount(ctx context.Context, req *SetUserCountRequest, opts ...http.CallOption) (rsp *SetUserCountReply, err error)
 	SetVipThree(ctx context.Context, req *SetVipThreeRequest, opts ...http.CallOption) (rsp *SetVipThreeReply, err error)
 	UpdateCanVip(ctx context.Context, req *UpdateCanVipRequest, opts ...http.CallOption) (rsp *UpdateCanVipReply, err error)
+	UpdateUserInfoTo(ctx context.Context, req *UpdateUserInfoToRequest, opts ...http.CallOption) (rsp *UpdateUserInfoToReply, err error)
 }
 
 type UserHTTPClientImpl struct {
@@ -514,6 +540,19 @@ func (c *UserHTTPClientImpl) UpdateCanVip(ctx context.Context, in *UpdateCanVipR
 	pattern := "/api/admin_dhb/set_can_vip"
 	path := binding.EncodeURL(pattern, in, false)
 	opts = append(opts, http.Operation(OperationUserUpdateCanVip))
+	opts = append(opts, http.PathTemplate(pattern))
+	err := c.cc.Invoke(ctx, "POST", path, in.SendBody, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, err
+}
+
+func (c *UserHTTPClientImpl) UpdateUserInfoTo(ctx context.Context, in *UpdateUserInfoToRequest, opts ...http.CallOption) (*UpdateUserInfoToReply, error) {
+	var out UpdateUserInfoToReply
+	pattern := "/api/admin_dhb/set_user_info_to"
+	path := binding.EncodeURL(pattern, in, false)
+	opts = append(opts, http.Operation(OperationUserUpdateUserInfoTo))
 	opts = append(opts, http.PathTemplate(pattern))
 	err := c.cc.Invoke(ctx, "POST", path, in.SendBody, &out, opts...)
 	if err != nil {

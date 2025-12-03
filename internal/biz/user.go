@@ -10,9 +10,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/go-kratos/kratos/v2/log"
+	transporthttp "github.com/go-kratos/kratos/v2/transport/http"
 	jwt2 "github.com/golang-jwt/jwt/v5"
 	"io"
 	"io/ioutil"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"sort"
@@ -1034,6 +1036,127 @@ func (uuc *UserUseCase) AdminUserList(ctx context.Context, req *pb.AdminUserList
 	return res, nil
 }
 
+func (uuc *UserUseCase) UpdateUserInfoTo(ctx transporthttp.Context) error {
+	var (
+		err       error
+		accountId = "cb6c8028-c828-4596-a501-6fa3196af4d7"
+		bins      []*InterlaceCardBin
+	)
+	// 取原生 *http.Request，后面要用它的 Context 和 FormFile
+	//r := ctx.Request()
+
+	// 1. 普通表单字段
+	//name := r.FormValue("name")
+	//fmt.Println("name:", name)
+
+	//////////////////////////////////////////////
+	//// 2. 取上传文件 (form-data: file)
+	//file, header, err := r.FormFile("file")
+	//if err != nil {
+	//	return err
+	//}
+	//defer file.Close()
+	//
+	//// 3. 读取文件内容到内存（小文件 OK，大文件可以后面再做限制）
+	//fileBytes, err := io.ReadAll(file)
+	//if err != nil {
+	//	return err
+	//}
+	//
+	//// 文件名 & Content-Type
+	//fileName := header.Filename
+	//mimeType := header.Header.Get("Content-Type") // image/jpeg / image/png 等
+	//////////////////////////////////////////////
+
+	//////////////////////////////////////////////
+	// 2. 取上传文件 (form-data: file)
+	//fileTwo, headerTwo, err := r.FormFile("fileTwo")
+	//if err != nil {
+	//	return err
+	//}
+	//defer fileTwo.Close()
+	//
+	//// 3. 读取文件内容到内存（小文件 OK，大文件可以后面再做限制）
+	//fileBytesTwo, err := io.ReadAll(fileTwo)
+	//if err != nil {
+	//	return err
+	//}
+	//
+	//// 文件名 & Content-Type
+	//fileNameTwo := headerTwo.Filename
+	//mimeTypeTwo := headerTwo.Header.Get("Content-Type") // image/jpeg / image/png 等
+	//////////////////////////////////////////////
+
+	// 3. 拿 accountId（你前面已经实现了 InterlaceGetFirstAccountID）
+	//accountId, err = InterlaceGetFirstAccountID(r.Context())
+	//if err != nil {
+	//	return err
+	//}
+
+	//// 4. 调用你写好的上传函数（注意：传的是 r.Context()，不是 &context.Context()）
+	//fileID, err := InterlaceUploadFile(r.Context(), accountId, fileName, mimeType, fileBytes)
+	//if err != nil {
+	//	return err
+	//}
+	//
+	//// 4. 调用你写好的上传函数（注意：传的是 r.Context()，不是 &context.Context()）
+	//fileIDTwo, err := InterlaceUploadFile(r.Context(), accountId, fileNameTwo, mimeTypeTwo, fileBytesTwo)
+	//if err != nil {
+	//	return err
+	//}
+
+	fileID := "df81e2de-4a41-4983-a437-a43f0007b835"
+	fileIDTwo := "1929de31-de38-48ef-96ec-fac7aedc75da"
+
+	bins, err = InterlaceListAvailableBins(ctx, accountId)
+	if nil != err {
+		fmt.Println(err)
+		return err
+	}
+
+	for _, v := range bins {
+		// 3. 地址
+		addr := InterlaceAddress{
+			AddressLine1: "123 Main St",
+			City:         "SHEN YANG",
+			State:        "SY",
+			Country:      "CN",
+			PostalCode:   "111100",
+		}
+
+		// 4. 创建持卡人（只填必需字段）
+		var (
+			cardholderId string
+		)
+		cardholderId, err = InterlaceCreateCardholderMOR(
+			ctx,
+			v.ID,
+			accountId,
+			"840028401@qq.com",
+			"wang",
+			"jiabao",
+			"1993-07-14",
+			"M",
+			"CN",
+			"G12345678",
+			"CN-RIC",
+			addr,
+			fileID,
+			fileIDTwo,
+			"18645139950",
+			"86",
+		)
+		if nil != err {
+			fmt.Println(err)
+		}
+
+		fmt.Println(v, cardholderId)
+	}
+
+	return nil
+
+}
+
 func (uuc *UserUseCase) UpdateCanVip(ctx context.Context, req *pb.UpdateCanVipRequest) (*pb.UpdateCanVipReply, error) {
 	var (
 		err  error
@@ -1482,9 +1605,10 @@ func QueryCardHolderWithSign(holderId uint64, productId uint64) (*QueryCardHolde
 
 const (
 	interlaceBaseURL      = "https://api-sandbox.interlace.money/open-api/v3"
+	interlaceBaseURLV1    = "https://api-sandbox.interlace.money/open-api/v1"
 	interlaceClientID     = "interlacedc0330757f216112"
 	interlaceClientSecret = "c0d8019217ad4903bf09336320a4ddd9" // v3 的接口目前用不到 secret，但建议以后放到配置/环境变量
-	interlaceAccountId    = "571795"
+	interlaceAccountId    = "cb6c8028-c828-4596-a501-6fa3196af4d7"
 )
 
 // 缓存在当前进程里，如果你将来多实例部署/重启频繁，可以再扩展成 Redis 存储
@@ -1708,27 +1832,45 @@ func InterlaceCreateCardholder(ctx context.Context, token string, user *User) (s
 // InterlaceCardBin 用来接住 List all available card BINs 返回里的单个 BIN 信息。
 // 接口文档保证至少有 binId 字段，其他字段我们先按常见命名猜一猜，多出来没关系。
 type InterlaceCardBin struct {
-	BinId          string   `json:"binId"`
-	Bin            string   `json:"bin"`          // 例如 "414631"
-	Brand          string   `json:"brand"`        // Visa/Master 等（实际字段名你可以根据返回修）
-	CardType       string   `json:"cardType"`     // PREPAID / CREDIT / DEBIT
-	SupportedForms []string `json:"cardForm"`     // ["VIRTUAL","PHYSICAL"] 等
-	Currencies     []string `json:"cardCurrency"` // ["USD", ...]
-	Region         string   `json:"region"`       // 例如 "HK"
+	ID                  string   `json:"id"`
+	Bin                 string   `json:"bin"`
+	Type                int      `json:"type"` // 0/1
+	Currencies          []string `json:"currencies"`
+	Network             string   `json:"network"`
+	SupportPhysicalCard bool     `json:"supportPhysicalCard"`
+
+	Verification struct {
+		Avs     bool `json:"avs"`
+		ThreeDs bool `json:"threeDs"`
+	} `json:"verification"`
+
+	PurchaseLimit struct {
+		Day      string `json:"day"`
+		Single   string `json:"single"`
+		Lifetime string `json:"lifetime"`
+	} `json:"purchaseLimit"`
+}
+
+var outer struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+	Data    struct {
+		List  []InterlaceCardBin `json:"list"`
+		Total string             `json:"total"` // 注意这里
+	} `json:"data"`
 }
 
 // InterlaceListAvailableBins 使用 x-access-token + accountId 获取可用 BIN
-func InterlaceListAvailableBins(ctx context.Context) ([]*InterlaceCardBin, error) {
+func InterlaceListAvailableBins(ctx context.Context, accountId string) ([]*InterlaceCardBin, error) {
 	accessToken, err := GetInterlaceAccessToken(ctx)
-	if nil != err || "" == accessToken {
+	if err != nil || accessToken == "" {
 		fmt.Println("获取access token错误")
 		return nil, err
 	}
-	// 构造 URL: /open-api/v3/card/bins?accountId=...
+
 	base := interlaceBaseURL + "/card/bins"
 	q := url.Values{}
-	q.Set("accountId", interlaceAccountId)
-	// 可选：q.Set("limit", "10"); q.Set("page", "1")
+	q.Set("accountId", accountId)
 	urlStr := base + "?" + q.Encode()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, urlStr, nil)
@@ -1736,7 +1878,6 @@ func InterlaceListAvailableBins(ctx context.Context) ([]*InterlaceCardBin, error
 		return nil, err
 	}
 	req.Header.Set("Accept", "application/json")
-	// ★ 关键：用 x-access-token，而不是 Authorization
 	req.Header.Set("x-access-token", accessToken)
 
 	client := &http.Client{Timeout: 10 * time.Second}
@@ -1755,17 +1896,8 @@ func InterlaceListAvailableBins(ctx context.Context) ([]*InterlaceCardBin, error
 		return nil, fmt.Errorf("interlace list card bins http %d: %s", resp.StatusCode, string(body))
 	}
 
-	fmt.Println("interlace list card bins body:", string(body))
+	//fmt.Println("interlace list card bins body:", string(body))
 
-	// 响应结构：{code, message, data: { list: [...], total: ... } }
-	var outer struct {
-		Code    string `json:"code"`
-		Message string `json:"message"`
-		Data    struct {
-			List  []InterlaceCardBin `json:"list"`
-			Total int64              `json:"total"`
-		} `json:"data"`
-	}
 	if err := json.Unmarshal(body, &outer); err != nil {
 		return nil, fmt.Errorf("list card bins unmarshal: %w", err)
 	}
@@ -1773,11 +1905,455 @@ func InterlaceListAvailableBins(ctx context.Context) ([]*InterlaceCardBin, error
 		return nil, fmt.Errorf("list card bins failed: code=%s msg=%s", outer.Code, outer.Message)
 	}
 
-	// 转成 []*InterlaceCardBin
 	bins := make([]*InterlaceCardBin, 0, len(outer.Data.List))
 	for i := range outer.Data.List {
 		b := outer.Data.List[i]
 		bins = append(bins, &b)
 	}
 	return bins, nil
+}
+
+// InterlaceGetFirstAccountID 调用 v1 /accounts，返回一个可用的 accountId
+// 当前返回示例：{"code":0,"message":"ok","data":{"data":[{...}],"pageTotal":1,"total":1}}
+func InterlaceGetFirstAccountID(ctx context.Context) (string, error) {
+	accessToken, err := GetInterlaceAccessToken(ctx)
+	if err != nil || accessToken == "" {
+		fmt.Println("获取access token错误", err)
+		return "", err
+	}
+
+	urlStr := interlaceBaseURLV1 + "/accounts"
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, urlStr, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("x-access-token", accessToken)
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer func(Body io.ReadCloser) { _ = Body.Close() }(resp.Body)
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	//fmt.Println("interlace v1 list accounts status:", resp.StatusCode)
+	//fmt.Println("interlace v1 list accounts body:", string(body))
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", fmt.Errorf("interlace v1 accounts http %d: %s", resp.StatusCode, string(body))
+	}
+
+	// 按真实结构定义一个类型
+	type accountItem struct {
+		ID     string `json:"id"`
+		Type   string `json:"type"`
+		Status string `json:"status"`
+		Name   string `json:"name"`
+	}
+
+	type accountsResp struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+		Data    struct {
+			Data      []accountItem `json:"data"`
+			PageTotal int           `json:"pageTotal"`
+			Total     int           `json:"total"`
+		} `json:"data"`
+	}
+
+	var res accountsResp
+	if err := json.Unmarshal(body, &res); err != nil {
+		return "", fmt.Errorf("accounts unmarshal error: %w", err)
+	}
+
+	// code == 0 是成功
+	if res.Code != 0 {
+		return "", fmt.Errorf("accounts api failed: code=%d msg=%s", res.Code, res.Message)
+	}
+
+	if len(res.Data.Data) == 0 {
+		return "", fmt.Errorf("accounts list empty")
+	}
+
+	// 找一个 Active 的账号（你目前看到就是 ApiClient/Active 那个）
+	for _, acc := range res.Data.Data {
+		if acc.Status == "Active" && acc.ID != "" {
+			//fmt.Println("use accountId:", acc.ID, "type:", acc.Type, "name:", acc.Name)
+			return acc.ID, nil
+		}
+	}
+
+	return "", fmt.Errorf("no active account found")
+}
+
+// InterlaceCreateConsumerCardholder
+// 按照 MoR Consumer 模式，只用「必需字段」创建 cardholder，返回 cardholderId。
+func InterlaceCreateConsumerCardholder(ctx context.Context, u *User, bin *InterlaceCardBin) (string, error) {
+	if u == nil {
+		return "", fmt.Errorf("user is nil")
+	}
+	if bin == nil || bin.ID == "" {
+		return "", fmt.Errorf("bin is nil or bin.ID empty")
+	}
+
+	// 1) 拿 OAuth accessToken（Bearer，用于 /v3/cardholders）
+	accessToken, err := GetInterlaceAccessToken(ctx)
+	if err != nil || accessToken == "" {
+		fmt.Println("InterlaceCreateConsumerCardholder: 获取 access token 错误:", err)
+		return "", fmt.Errorf("get access token failed: %w", err)
+	}
+
+	// 2) 处理国家 / 区号（libphonenumber 要求 countryCode 是区号，不是 "CN" 这种）
+	// 你现在 user.CountryCode 字段存的是 "CN"/"HK" 这一类，为了先跑通，这里简单映射一下。
+	nationality := u.CountryCode
+	if nationality == "" {
+		nationality = "CN"
+	}
+	countryOfResidence := nationality
+
+	phoneCountryCode := u.CountryCode
+	if phoneCountryCode == "" || phoneCountryCode == "CN" {
+		phoneCountryCode = "+86"
+	}
+
+	// 3) 构建请求体 —— 字段名严格对齐官方文档
+	reqBody := map[string]interface{}{
+		"programType": "CONSUMER USE - MOR", // MoR Consumer 模式固定值
+
+		"binId": bin.ID, // 从 /card/bins 返回的某个 list[i].id
+
+		"name": map[string]interface{}{
+			"firstName": u.FirstName, // 你的 User 里已有
+			"lastName":  u.LastName,
+		},
+
+		"email": u.Email,
+
+		"phone": map[string]interface{}{
+			"countryCode": phoneCountryCode, // 例如 "+86"
+			"phoneNumber": u.Phone,          // 例如 "13077000000"
+		},
+
+		"dateOfBirth": u.BirthDate, // "1983-10-10"
+
+		"nationality":        nationality,        // "CN" / "HK" / "US"...
+		"countryOfResidence": countryOfResidence, // 一般和 nationality 一致
+
+		"address": map[string]interface{}{
+			"country":    nationality, // ISO2国家码
+			"state":      "",          // 先留空，有需要你用省份填
+			"city":       u.City,
+			"street":     u.Street,
+			"postalCode": u.PostalCode,
+		},
+	}
+
+	jsonData, err := json.Marshal(reqBody)
+	if err != nil {
+		return "", fmt.Errorf("marshal cardholder body error: %w", err)
+	}
+
+	// 4) 发送 HTTP 请求
+	urlStr := interlaceBaseURL + "/cardholders" // v3
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, urlStr, bytes.NewReader(jsonData))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+accessToken)
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	respBody, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	fmt.Println("interlace create cardholder status:", resp.StatusCode)
+	fmt.Println("interlace create cardholder body:", string(respBody))
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", fmt.Errorf("create cardholder http %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	// 5) 解析响应，只关心 code + data.id
+	var outer struct {
+		Code    string          `json:"code"`
+		Message string          `json:"message"`
+		Data    json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal(respBody, &outer); err != nil {
+		return "", fmt.Errorf("create cardholder unmarshal resp: %w", err)
+	}
+	if outer.Code != "000000" {
+		return "", fmt.Errorf("create cardholder failed: code=%s msg=%s", outer.Code, outer.Message)
+	}
+
+	// data 里至少会有 id
+	var data struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(outer.Data, &data); err != nil {
+		fmt.Println("create cardholder data raw:", string(outer.Data))
+		return "", fmt.Errorf("create cardholder data unmarshal: %w", err)
+	}
+	if data.ID == "" {
+		return "", fmt.Errorf("create cardholder success but id empty")
+	}
+
+	fmt.Println("interlace cardholderId:", data.ID)
+	return data.ID, nil
+}
+
+type InterlaceAddress struct {
+	AddressLine1 string
+	City         string
+	State        string
+	Country      string // ISO2, 如 "US"/"CN"
+	PostalCode   string
+}
+
+// InterlaceCreateCardholderMOR
+// 只用必填字段创建 MoR Consumer 持卡人，返回 cardholderId。
+func InterlaceCreateCardholderMOR(
+	ctx context.Context,
+	binId string,
+	accountId string,
+	email string,
+	firstName string,
+	lastName string,
+	dob string, // YYYY-MM-DD
+	gender string, // "M" / "F"
+	nationality string, // ISO2, e.g. "CN"
+	nationalId string,
+	idType string, // "CN-RIC" / "PASSPORT" / ...
+	addr InterlaceAddress,
+	idFrontId string,
+	selfie string,
+	phoneNumber string, // 不带国家码
+	phoneCountryCode string,
+) (string, error) {
+
+	if binId == "" || accountId == "" {
+		return "", fmt.Errorf("binId/accountId required")
+	}
+	if email == "" || firstName == "" || lastName == "" || dob == "" || gender == "" {
+		return "", fmt.Errorf("email/firstName/lastName/dob/gender required")
+	}
+	if nationality == "" || nationalId == "" || idType == "" {
+		return "", fmt.Errorf("nationality/nationalId/idType required")
+	}
+	if addr.AddressLine1 == "" || addr.City == "" || addr.State == "" || addr.Country == "" || addr.PostalCode == "" {
+		return "", fmt.Errorf("address fields required")
+	}
+	if idFrontId == "" || selfie == "" || phoneNumber == "" {
+		return "", fmt.Errorf("idFrontId/selfie/phoneNumber required")
+	}
+
+	accessToken, err := GetInterlaceAccessToken(ctx)
+	if err != nil || accessToken == "" {
+		return "", fmt.Errorf("get access token failed: %w", err)
+	}
+
+	body := map[string]interface{}{
+		"binId":         binId,
+		"accountId":     accountId,
+		"businessModel": "B2C_MOR",
+
+		"email":     email,
+		"firstName": firstName,
+		"lastName":  lastName,
+		"dob":       dob,
+		"gender":    gender,
+
+		"nationality": nationality,
+		"nationalId":  nationalId,
+		"idType":      idType,
+
+		"address": map[string]interface{}{
+			"addressLine1": addr.AddressLine1,
+			"city":         addr.City,
+			"state":        addr.State,
+			"country":      addr.Country,
+			"postalCode":   addr.PostalCode,
+		},
+
+		"idFrontId":        idFrontId,
+		"selfie":           selfie,
+		"phoneNumber":      phoneNumber,
+		"phoneCountryCode": phoneCountryCode,
+	}
+
+	jsonData, err := json.Marshal(body)
+	if err != nil {
+		return "", fmt.Errorf("marshal cardholder body error: %w", err)
+	}
+
+	urlStr := interlaceBaseURL + "/cardholders"
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, urlStr, bytes.NewReader(jsonData))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Content-Type", "application/json")
+	// Create cardholder 文档用的是 x-access-token
+	req.Header.Set("x-access-token", accessToken)
+
+	client := &http.Client{Timeout: 15 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	respBody, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	//fmt.Println("interlace create cardholder status:", resp.StatusCode)
+	//fmt.Println("interlace create cardholder body:", string(respBody))
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", fmt.Errorf("create cardholder http %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	var outer struct {
+		Code    string          `json:"code"`
+		Message string          `json:"message"`
+		Data    json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal(respBody, &outer); err != nil {
+		return "", fmt.Errorf("create cardholder unmarshal resp: %w", err)
+	}
+	if outer.Code != "000000" && outer.Code != "0" {
+		return "", fmt.Errorf("create cardholder failed: code=%s msg=%s", outer.Code, outer.Message)
+	}
+
+	var data struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(outer.Data, &data); err != nil {
+		fmt.Println("create cardholder data raw:", string(outer.Data))
+		return "", fmt.Errorf("create cardholder data unmarshal: %w", err)
+	}
+	if data.ID == "" {
+		return "", fmt.Errorf("create cardholder success but id empty")
+	}
+
+	//fmt.Println("cardholderId:", data.ID)
+	return data.ID, nil
+}
+
+// 上传一个文件到 Interlace，返回 fileId（用于 idFrontId / selfie 等）
+func InterlaceUploadFile(ctx context.Context, accountId, fileName, mimeType string, fileData []byte) (string, error) {
+	if accountId == "" {
+		return "", fmt.Errorf("accountId required")
+	}
+	if len(fileData) == 0 {
+		return "", fmt.Errorf("fileData is empty")
+	}
+
+	// 1) 拿 accessToken（后面用 x-access-token）
+	accessToken, err := GetInterlaceAccessToken(ctx)
+	if err != nil || accessToken == "" {
+		return "", fmt.Errorf("get access token failed: %w", err)
+	}
+
+	// 2) 构造 multipart/form-data
+	var buf bytes.Buffer
+	writer := multipart.NewWriter(&buf)
+
+	// files 字段（必填）
+	part, err := writer.CreateFormFile("files", fileName)
+	if err != nil {
+		return "", fmt.Errorf("create form file error: %w", err)
+	}
+	if _, err := part.Write(fileData); err != nil {
+		return "", fmt.Errorf("write file data error: %w", err)
+	}
+
+	// accountId 字段（必填）
+	if err := writer.WriteField("accountId", accountId); err != nil {
+		return "", fmt.Errorf("write accountId field error: %w", err)
+	}
+
+	if err := writer.Close(); err != nil {
+		return "", fmt.Errorf("multipart writer close error: %w", err)
+	}
+
+	// 3) 发请求
+	urlStr := interlaceBaseURL + "/files/upload"
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, urlStr, &buf)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("x-access-token", accessToken)
+
+	client := &http.Client{Timeout: 20 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	//fmt.Println("interlace upload file status:", resp.StatusCode)
+	//fmt.Println("interlace upload file body:", string(bodyBytes))
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", fmt.Errorf("upload file http %d: %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	// 4) 解析响应：{code, message, data: [...] } 或 {code, message, data:{id:...}}
+	var outer struct {
+		Code    string          `json:"code"`
+		Message string          `json:"message"`
+		Data    json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal(bodyBytes, &outer); err != nil {
+		return "", fmt.Errorf("upload file unmarshal resp: %w", err)
+	}
+	if outer.Code != "000000" && outer.Code != "0" {
+		return "", fmt.Errorf("upload file failed: code=%s msg=%s", outer.Code, outer.Message)
+	}
+
+	// data 可能是数组，也可能是对象，两种都试一下
+	var arr []struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(outer.Data, &arr); err == nil && len(arr) > 0 && arr[0].ID != "" {
+		return arr[0].ID, nil
+	}
+
+	var single struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal(outer.Data, &single); err == nil && single.ID != "" {
+		return single.ID, nil
+	}
+
+	// 文档只写 code/message 的话，这里可能拿不到 id，就先抛错
+	return "", fmt.Errorf("upload file success but file id not found in data")
 }

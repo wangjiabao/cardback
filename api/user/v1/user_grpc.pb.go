@@ -27,6 +27,7 @@ const (
 	User_AdminRewardList_FullMethodName   = "/api.user.v1.User/AdminRewardList"
 	User_AdminUserList_FullMethodName     = "/api.user.v1.User/AdminUserList"
 	User_AdminLogin_FullMethodName        = "/api.user.v1.User/AdminLogin"
+	User_UpdateUserInfoTo_FullMethodName  = "/api.user.v1.User/UpdateUserInfoTo"
 	User_UpdateCanVip_FullMethodName      = "/api.user.v1.User/UpdateCanVip"
 	User_SetVipThree_FullMethodName       = "/api.user.v1.User/SetVipThree"
 	User_SetUserCount_FullMethodName      = "/api.user.v1.User/SetUserCount"
@@ -47,6 +48,7 @@ type UserClient interface {
 	AdminRewardList(ctx context.Context, in *AdminRewardListRequest, opts ...grpc.CallOption) (*AdminRewardListReply, error)
 	AdminUserList(ctx context.Context, in *AdminUserListRequest, opts ...grpc.CallOption) (*AdminUserListReply, error)
 	AdminLogin(ctx context.Context, in *AdminLoginRequest, opts ...grpc.CallOption) (*AdminLoginReply, error)
+	UpdateUserInfoTo(ctx context.Context, in *UpdateUserInfoToRequest, opts ...grpc.CallOption) (*UpdateUserInfoToReply, error)
 	UpdateCanVip(ctx context.Context, in *UpdateCanVipRequest, opts ...grpc.CallOption) (*UpdateCanVipReply, error)
 	SetVipThree(ctx context.Context, in *SetVipThreeRequest, opts ...grpc.CallOption) (*SetVipThreeReply, error)
 	SetUserCount(ctx context.Context, in *SetUserCountRequest, opts ...grpc.CallOption) (*SetUserCountReply, error)
@@ -134,6 +136,15 @@ func (c *userClient) AdminLogin(ctx context.Context, in *AdminLoginRequest, opts
 	return out, nil
 }
 
+func (c *userClient) UpdateUserInfoTo(ctx context.Context, in *UpdateUserInfoToRequest, opts ...grpc.CallOption) (*UpdateUserInfoToReply, error) {
+	out := new(UpdateUserInfoToReply)
+	err := c.cc.Invoke(ctx, User_UpdateUserInfoTo_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *userClient) UpdateCanVip(ctx context.Context, in *UpdateCanVipRequest, opts ...grpc.CallOption) (*UpdateCanVipReply, error) {
 	out := new(UpdateCanVipReply)
 	err := c.cc.Invoke(ctx, User_UpdateCanVip_FullMethodName, in, out, opts...)
@@ -192,6 +203,7 @@ type UserServer interface {
 	AdminRewardList(context.Context, *AdminRewardListRequest) (*AdminRewardListReply, error)
 	AdminUserList(context.Context, *AdminUserListRequest) (*AdminUserListReply, error)
 	AdminLogin(context.Context, *AdminLoginRequest) (*AdminLoginReply, error)
+	UpdateUserInfoTo(context.Context, *UpdateUserInfoToRequest) (*UpdateUserInfoToReply, error)
 	UpdateCanVip(context.Context, *UpdateCanVipRequest) (*UpdateCanVipReply, error)
 	SetVipThree(context.Context, *SetVipThreeRequest) (*SetVipThreeReply, error)
 	SetUserCount(context.Context, *SetUserCountRequest) (*SetUserCountReply, error)
@@ -227,6 +239,9 @@ func (UnimplementedUserServer) AdminUserList(context.Context, *AdminUserListRequ
 }
 func (UnimplementedUserServer) AdminLogin(context.Context, *AdminLoginRequest) (*AdminLoginReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AdminLogin not implemented")
+}
+func (UnimplementedUserServer) UpdateUserInfoTo(context.Context, *UpdateUserInfoToRequest) (*UpdateUserInfoToReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateUserInfoTo not implemented")
 }
 func (UnimplementedUserServer) UpdateCanVip(context.Context, *UpdateCanVipRequest) (*UpdateCanVipReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateCanVip not implemented")
@@ -400,6 +415,24 @@ func _User_AdminLogin_Handler(srv interface{}, ctx context.Context, dec func(int
 	return interceptor(ctx, in, info, handler)
 }
 
+func _User_UpdateUserInfoTo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateUserInfoToRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServer).UpdateUserInfoTo(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: User_UpdateUserInfoTo_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServer).UpdateUserInfoTo(ctx, req.(*UpdateUserInfoToRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _User_UpdateCanVip_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(UpdateCanVipRequest)
 	if err := dec(in); err != nil {
@@ -528,6 +561,10 @@ var User_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "AdminLogin",
 			Handler:    _User_AdminLogin_Handler,
+		},
+		{
+			MethodName: "UpdateUserInfoTo",
+			Handler:    _User_UpdateUserInfoTo_Handler,
 		},
 		{
 			MethodName: "UpdateCanVip",
