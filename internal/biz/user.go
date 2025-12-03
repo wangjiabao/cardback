@@ -1347,179 +1347,6 @@ func CreateCardRequestWithSign(cardAmount uint64, cardholderId uint64, cardProdu
 	return &result, nil
 }
 
-type CardProductListResponse struct {
-	Total int           `json:"total"`
-	Rows  []CardProduct `json:"rows"`
-	Code  int           `json:"code"`
-	Msg   string        `json:"msg"`
-}
-
-type CardProduct struct {
-	ProductId          string       `json:"productId"` // ← 改成 string
-	ProductName        string       `json:"productName"`
-	ModeType           string       `json:"modeType"`
-	CardBin            string       `json:"cardBin"`
-	CardForm           []string     `json:"cardForm"`
-	MaxCardQuota       int          `json:"maxCardQuota"`
-	CardScheme         string       `json:"cardScheme"`
-	NoPinPaymentAmount []AmountItem `json:"noPinPaymentAmount"`
-	CardCurrency       []string     `json:"cardCurrency"`
-	CreateTime         string       `json:"createTime"`
-	UpdateTime         string       `json:"updateTime"`
-	ProductStatus      string       `json:"productStatus"`
-}
-
-type AmountItem struct {
-	Amount   string `json:"amount"`
-	Currency string `json:"currency"`
-}
-
-func GetCardProducts() (*CardProductListResponse, error) {
-	baseURL := "http://120.79.173.55:9102/prod-api/vcc/api/v1/cards/products/all"
-
-	reqBody := map[string]interface{}{
-		"merchantId": "322338",
-	}
-
-	sign := GenerateSign(reqBody, "j4gqNRcpTDJr50AP2xd9obKWZIKWbeo9")
-
-	params := url.Values{}
-	params.Set("merchantId", "322338")
-	params.Set("sign", sign)
-
-	fullURL := fmt.Sprintf("%s?%s", baseURL, params.Encode())
-
-	req, err := http.NewRequest("GET", fullURL, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("Content-Language", "zh_CN")
-
-	client := &http.Client{
-		Timeout: 10 * time.Second,
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func(Body io.ReadCloser) {
-		errTwo := Body.Close()
-		if errTwo != nil {
-
-		}
-	}(resp.Body)
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	//fmt.Println("响应报文:", string(body))
-
-	var result CardProductListResponse
-	err = json.Unmarshal(body, &result)
-	if err != nil {
-		fmt.Println("JSON 解析失败:", err)
-		return nil, err
-	}
-
-	//fmt.Println(result)
-
-	return &result, nil
-}
-
-type CreateCardholderResponse struct {
-	Code int    `json:"code"`
-	Msg  string `json:"msg"`
-	Data struct {
-		HolderID    string `json:"holderId"`
-		Email       string `json:"email"`
-		FirstName   string `json:"firstName"`
-		LastName    string `json:"lastName"`
-		BirthDate   string `json:"birthDate"`
-		CountryCode string `json:"countryCode"`
-		PhoneNumber string `json:"phoneNumber"`
-
-		DeliveryAddress DeliveryAddress `json:"deliveryAddress"`
-		ProofFile       ProofFile       `json:"proofFile"`
-	} `json:"data"`
-}
-
-type DeliveryAddress struct {
-	City    string `json:"city"`
-	Country string `json:"country"`
-	Street  string `json:"street"`
-}
-
-type ProofFile struct {
-	FileBase64 string `json:"fileBase64"`
-	FileType   string `json:"fileType"`
-}
-
-func CreateCardholderRequest(productId uint64, user *User) (*CreateCardholderResponse, error) {
-	//baseURL := "https://www.ispay.com/prod-api/vcc/api/v1/cards/holders/create"
-	baseURL := "http://120.79.173.55:9102/prod-api/vcc/api/v1/cards/holders/create"
-
-	reqBody := map[string]interface{}{
-		"productId":   productId,
-		"merchantId":  "322338",
-		"email":       user.Email,
-		"firstName":   user.FirstName,
-		"lastName":    user.LastName,
-		"birthDate":   user.BirthDate,
-		"countryCode": user.CountryCode,
-		"phoneNumber": user.Phone,
-		"deliveryAddress": map[string]interface{}{
-			"city":       user.City,
-			"country":    user.Country,
-			"street":     user.Street,
-			"postalCode": user.PostalCode,
-		},
-	}
-
-	// 生成签名
-	sign := GenerateSign(reqBody, "j4gqNRcpTDJr50AP2xd9obKWZIKWbeo9") // 用你的密钥替换
-	reqBody["sign"] = sign
-
-	// 构造请求
-	jsonData, err := json.Marshal(reqBody)
-	if err != nil {
-		return nil, fmt.Errorf("json marshal error: %v", err)
-	}
-
-	req, err := http.NewRequest("POST", baseURL, bytes.NewBuffer(jsonData))
-	if err != nil {
-		return nil, fmt.Errorf("new request error: %v", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("http do error: %v", err)
-	}
-	defer func(Body io.ReadCloser) {
-		errTwo := Body.Close()
-		if errTwo != nil {
-
-		}
-	}(resp.Body)
-
-	body, _ := io.ReadAll(resp.Body)
-	fmt.Println("响应报文:", string(body))
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("http status not ok: %v", resp.StatusCode)
-	}
-
-	var result CreateCardholderResponse
-	if err := json.Unmarshal(body, &result); err != nil {
-		return nil, fmt.Errorf("json unmarshal error: %v", err)
-	}
-
-	return &result, nil
-}
-
 type CardInfoResponse struct {
 	Code int    `json:"code"`
 	Msg  string `json:"msg"`
@@ -1649,4 +1476,308 @@ func QueryCardHolderWithSign(holderId uint64, productId uint64) (*QueryCardHolde
 	}
 
 	return &result, nil
+}
+
+// ================= Interlace 授权配置 & 缓存 =================
+
+const (
+	interlaceBaseURL      = "https://api-sandbox.interlace.money/open-api/v3"
+	interlaceClientID     = "interlacedc0330757f216112"
+	interlaceClientSecret = "c0d8019217ad4903bf09336320a4ddd9" // v3 的接口目前用不到 secret，但建议以后放到配置/环境变量
+	interlaceAccountId    = "571795"
+)
+
+// 缓存在当前进程里，如果你将来多实例部署/重启频繁，可以再扩展成 Redis 存储
+type interlaceAuthCache struct {
+	AccessToken  string
+	RefreshToken string
+	ExpireAt     int64 // unix 秒，提前留一点余量
+}
+
+var (
+	interlaceAuth    = &interlaceAuthCache{}
+	interlaceAuthMux sync.Mutex
+)
+
+// GetInterlaceAccessToken 获取一个当前可用的 accessToken
+// 1. 如果缓存里有且没过期，直接返回
+// 2. 否则调用 GetCode + Generate Access Token 重新获取
+func GetInterlaceAccessToken(ctx context.Context) (string, error) {
+	interlaceAuthMux.Lock()
+	defer interlaceAuthMux.Unlock()
+
+	now := time.Now().Unix()
+	// 缓存未过期，直接用（提前 60 秒过期，避免边界）
+	if interlaceAuth.AccessToken != "" && now < interlaceAuth.ExpireAt-60 {
+		return interlaceAuth.AccessToken, nil
+	}
+
+	// 这里可以先尝试用 refreshToken 刷新（如果你想用 refresh-token 接口）
+	// 为了简单稳定，这里直接重新 Get Code + Access Token
+	code, err := interlaceGetCode(ctx)
+	if err != nil {
+		return "", fmt.Errorf("get interlace code failed: %w", err)
+	}
+
+	accessToken, refreshToken, expiresIn, err := interlaceGenerateAccessToken(ctx, code)
+	if err != nil {
+		return "", fmt.Errorf("generate interlace access token failed: %w", err)
+	}
+
+	interlaceAuth.AccessToken = accessToken
+	interlaceAuth.RefreshToken = refreshToken
+	interlaceAuth.ExpireAt = time.Now().Unix() + expiresIn
+
+	return accessToken, nil
+}
+
+// Get a code 响应结构
+type interlaceGetCodeResp struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+	Data    struct {
+		Timestamp int64  `json:"timestamp"`
+		Code      string `json:"code"`
+	} `json:"data"`
+}
+
+func interlaceGetCode(ctx context.Context) (string, error) {
+	urlStr := fmt.Sprintf("%s/oauth/authorize?clientId=%s", interlaceBaseURL, interlaceClientID)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, urlStr, nil)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Accept", "application/json")
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer func(Body io.ReadCloser) {
+		_ = Body.Close()
+	}(resp.Body)
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("interlace get code http %d: %s", resp.StatusCode, string(body))
+	}
+
+	var result interlaceGetCodeResp
+	if err := json.Unmarshal(body, &result); err != nil {
+		return "", fmt.Errorf("interlace get code unmarshal: %w", err)
+	}
+
+	if result.Code != "000000" {
+		return "", fmt.Errorf("interlace get code failed: code=%s msg=%s", result.Code, result.Message)
+	}
+	if result.Data.Code == "" {
+		return "", fmt.Errorf("interlace get code success but orderId empty")
+	}
+
+	return result.Data.Code, nil
+}
+
+// Generate an access token 响应结构
+type interlaceAccessTokenResp struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+	Data    struct {
+		AccessToken  string `json:"accessToken"`
+		RefreshToken string `json:"refreshToken"`
+		ExpiresIn    int64  `json:"expiresIn"` // 有效期秒数，比如 86400
+		Timestamp    int64  `json:"timestamp"`
+	} `json:"data"`
+}
+
+func interlaceGenerateAccessToken(ctx context.Context, code string) (accessToken, refreshToken string, expiresIn int64, err error) {
+	urlStr := fmt.Sprintf("%s/oauth/access-token", interlaceBaseURL)
+
+	reqBody := map[string]interface{}{
+		"clientId": interlaceClientID,
+		"code":     code,
+	}
+	jsonData, _ := json.Marshal(reqBody)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, urlStr, bytes.NewReader(jsonData))
+	if err != nil {
+		return "", "", 0, err
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", "", 0, err
+	}
+	defer func(Body io.ReadCloser) {
+		_ = Body.Close()
+	}(resp.Body)
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", "", 0, err
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", "", 0, fmt.Errorf("interlace access-token http %d: %s", resp.StatusCode, string(body))
+	}
+
+	var result interlaceAccessTokenResp
+	if err := json.Unmarshal(body, &result); err != nil {
+		return "", "", 0, fmt.Errorf("interlace access-token unmarshal: %w", err)
+	}
+
+	if result.Code != "000000" {
+		return "", "", 0, fmt.Errorf("interlace access-token failed: code=%s msg=%s", result.Code, result.Message)
+	}
+	if result.Data.AccessToken == "" {
+		return "", "", 0, fmt.Errorf("interlace access-token success but accessToken empty")
+	}
+
+	return result.Data.AccessToken, result.Data.RefreshToken, result.Data.ExpiresIn, nil
+}
+
+func InterlaceCreateCardholder(ctx context.Context, token string, user *User) (string, error) {
+	urlStr := interlaceBaseURL + "/cardholders"
+
+	reqBody := map[string]interface{}{
+		"programType": "BUSINESS USE - MOR", // 你用的是商户代收付 Mor 模式
+		// "binId": ...,
+		"name": map[string]interface{}{
+			"firstName": user.FirstName,
+			"lastName":  user.LastName,
+		},
+		"email": user.Email,
+		// 其它字段按文档补
+	}
+	jsonData, _ := json.Marshal(reqBody)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, urlStr, bytes.NewReader(jsonData))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	body, _ := ioutil.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("create cardholder http %d: %s", resp.StatusCode, string(body))
+	}
+
+	var result struct {
+		Code    string          `json:"code"`
+		Message string          `json:"message"`
+		Data    json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return "", err
+	}
+	if result.Code != "000000" {
+		return "", fmt.Errorf("create cardholder failed: %s", result.Message)
+	}
+
+	// 解析真实的 cardholderId 字段（按 Cardholder 文档来）
+	var data struct {
+		CardholderID string `json:"cardholderId"`
+	}
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		return "", err
+	}
+	if data.CardholderID == "" {
+		return "", fmt.Errorf("cardholderId empty")
+	}
+
+	return data.CardholderID, nil
+}
+
+// InterlaceCardBin 用来接住 List all available card BINs 返回里的单个 BIN 信息。
+// 接口文档保证至少有 binId 字段，其他字段我们先按常见命名猜一猜，多出来没关系。
+type InterlaceCardBin struct {
+	BinId          string   `json:"binId"`
+	Bin            string   `json:"bin"`          // 例如 "414631"
+	Brand          string   `json:"brand"`        // Visa/Master 等（实际字段名你可以根据返回修）
+	CardType       string   `json:"cardType"`     // PREPAID / CREDIT / DEBIT
+	SupportedForms []string `json:"cardForm"`     // ["VIRTUAL","PHYSICAL"] 等
+	Currencies     []string `json:"cardCurrency"` // ["USD", ...]
+	Region         string   `json:"region"`       // 例如 "HK"
+}
+
+// InterlaceListAvailableBins 使用 x-access-token + accountId 获取可用 BIN
+func InterlaceListAvailableBins(ctx context.Context) ([]*InterlaceCardBin, error) {
+	accessToken, err := GetInterlaceAccessToken(ctx)
+	if nil != err || "" == accessToken {
+		fmt.Println("获取access token错误")
+		return nil, err
+	}
+	// 构造 URL: /open-api/v3/card/bins?accountId=...
+	base := interlaceBaseURL + "/card/bins"
+	q := url.Values{}
+	q.Set("accountId", interlaceAccountId)
+	// 可选：q.Set("limit", "10"); q.Set("page", "1")
+	urlStr := base + "?" + q.Encode()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, urlStr, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/json")
+	// ★ 关键：用 x-access-token，而不是 Authorization
+	req.Header.Set("x-access-token", accessToken)
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("interlace list card bins http %d: %s", resp.StatusCode, string(body))
+	}
+
+	fmt.Println("interlace list card bins body:", string(body))
+
+	// 响应结构：{code, message, data: { list: [...], total: ... } }
+	var outer struct {
+		Code    string `json:"code"`
+		Message string `json:"message"`
+		Data    struct {
+			List  []InterlaceCardBin `json:"list"`
+			Total int64              `json:"total"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(body, &outer); err != nil {
+		return nil, fmt.Errorf("list card bins unmarshal: %w", err)
+	}
+	if outer.Code != "000000" {
+		return nil, fmt.Errorf("list card bins failed: code=%s msg=%s", outer.Code, outer.Message)
+	}
+
+	// 转成 []*InterlaceCardBin
+	bins := make([]*InterlaceCardBin, 0, len(outer.Data.List))
+	for i := range outer.Data.List {
+		b := outer.Data.List[i]
+		bins = append(bins, &b)
+	}
+	return bins, nil
 }
