@@ -1039,52 +1039,84 @@ func (uuc *UserUseCase) AdminUserList(ctx context.Context, req *pb.AdminUserList
 func (uuc *UserUseCase) UpdateUserInfoTo(ctx transporthttp.Context) error {
 	var (
 		err       error
-		accountId = "cb6c8028-c828-4596-a501-6fa3196af4d7"
+		accountId = interlaceAccountId
 		bins      []*InterlaceCardBin
 	)
 	// 取原生 *http.Request，后面要用它的 Context 和 FormFile
-	//r := ctx.Request()
+	r := ctx.Request()
 
 	// 1. 普通表单字段
-	//name := r.FormValue("name")
-	//fmt.Println("name:", name)
+	userIdS := r.FormValue("userId")
+	email := r.FormValue("email")
+	firstName := r.FormValue("firstName")
+	lastName := r.FormValue("lastName")
+	dob := r.FormValue("dob")
+	gender := r.FormValue("gender")
+	nationality := "CN"
+	nationalid := "G12345678"
+	idType := "CN-RIC"
+	phoneNumber := r.FormValue("phoneNumber")
+	phoneCountryCode := r.FormValue("phoneCountryCode")
+	addressLine1 := r.FormValue("addressLine")
+	city := r.FormValue("city")
+	state := r.FormValue("state")
+	country := r.FormValue("country")
+	postalCode := r.FormValue("postalCode")
+
+	userId, err := strconv.ParseUint(userIdS, 10, 64)
+	if err != nil {
+		return err
+	}
+	var (
+		user *User
+	)
+	user, err = uuc.repo.GetUserById(userId)
+	if err != nil {
+		return err
+	}
+
+	if "do" != user.CardOrderId {
+		if err != nil {
+			return nil
+		}
+	}
 
 	//////////////////////////////////////////////
-	//// 2. 取上传文件 (form-data: file)
-	//file, header, err := r.FormFile("file")
-	//if err != nil {
-	//	return err
-	//}
-	//defer file.Close()
-	//
-	//// 3. 读取文件内容到内存（小文件 OK，大文件可以后面再做限制）
-	//fileBytes, err := io.ReadAll(file)
-	//if err != nil {
-	//	return err
-	//}
-	//
-	//// 文件名 & Content-Type
-	//fileName := header.Filename
-	//mimeType := header.Header.Get("Content-Type") // image/jpeg / image/png 等
+	// 2. 取上传文件 (form-data: file)
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	// 3. 读取文件内容到内存（小文件 OK，大文件可以后面再做限制）
+	fileBytes, err := io.ReadAll(file)
+	if err != nil {
+		return err
+	}
+
+	// 文件名 & Content-Type
+	fileName := header.Filename
+	mimeType := header.Header.Get("Content-Type") // image/jpeg / image/png 等
 	//////////////////////////////////////////////
 
 	//////////////////////////////////////////////
 	// 2. 取上传文件 (form-data: file)
-	//fileTwo, headerTwo, err := r.FormFile("fileTwo")
-	//if err != nil {
-	//	return err
-	//}
-	//defer fileTwo.Close()
-	//
-	//// 3. 读取文件内容到内存（小文件 OK，大文件可以后面再做限制）
-	//fileBytesTwo, err := io.ReadAll(fileTwo)
-	//if err != nil {
-	//	return err
-	//}
-	//
-	//// 文件名 & Content-Type
-	//fileNameTwo := headerTwo.Filename
-	//mimeTypeTwo := headerTwo.Header.Get("Content-Type") // image/jpeg / image/png 等
+	fileTwo, headerTwo, err := r.FormFile("fileTwo")
+	if err != nil {
+		return err
+	}
+	defer fileTwo.Close()
+
+	// 3. 读取文件内容到内存（小文件 OK，大文件可以后面再做限制）
+	fileBytesTwo, err := io.ReadAll(fileTwo)
+	if err != nil {
+		return err
+	}
+
+	// 文件名 & Content-Type
+	fileNameTwo := headerTwo.Filename
+	mimeTypeTwo := headerTwo.Header.Get("Content-Type") // image/jpeg / image/png 等
 	//////////////////////////////////////////////
 
 	// 3. 拿 accountId（你前面已经实现了 InterlaceGetFirstAccountID）
@@ -1093,20 +1125,17 @@ func (uuc *UserUseCase) UpdateUserInfoTo(ctx transporthttp.Context) error {
 	//	return err
 	//}
 
-	//// 4. 调用你写好的上传函数（注意：传的是 r.Context()，不是 &context.Context()）
-	//fileID, err := InterlaceUploadFile(r.Context(), accountId, fileName, mimeType, fileBytes)
-	//if err != nil {
-	//	return err
-	//}
-	//
-	//// 4. 调用你写好的上传函数（注意：传的是 r.Context()，不是 &context.Context()）
-	//fileIDTwo, err := InterlaceUploadFile(r.Context(), accountId, fileNameTwo, mimeTypeTwo, fileBytesTwo)
-	//if err != nil {
-	//	return err
-	//}
+	// 4. 调用你写好的上传函数（注意：传的是 r.Context()，不是 &context.Context()）
+	fileID, err := InterlaceUploadFile(r.Context(), accountId, fileName, mimeType, fileBytes)
+	if err != nil {
+		return err
+	}
 
-	fileID := "df81e2de-4a41-4983-a437-a43f0007b835"
-	fileIDTwo := "1929de31-de38-48ef-96ec-fac7aedc75da"
+	// 4. 调用你写好的上传函数（注意：传的是 r.Context()，不是 &context.Context()）
+	fileIDTwo, err := InterlaceUploadFile(r.Context(), accountId, fileNameTwo, mimeTypeTwo, fileBytesTwo)
+	if err != nil {
+		return err
+	}
 
 	bins, err = InterlaceListAvailableBins(ctx, accountId)
 	if nil != err {
@@ -1117,11 +1146,11 @@ func (uuc *UserUseCase) UpdateUserInfoTo(ctx transporthttp.Context) error {
 	for _, v := range bins {
 		// 3. 地址
 		addr := InterlaceAddress{
-			AddressLine1: "123 Main St",
-			City:         "SHEN YANG",
-			State:        "SY",
-			Country:      "CN",
-			PostalCode:   "111100",
+			AddressLine1: addressLine1,
+			City:         city,
+			State:        state,
+			Country:      country,
+			PostalCode:   postalCode,
 		}
 
 		// 4. 创建持卡人（只填必需字段）
@@ -1132,19 +1161,19 @@ func (uuc *UserUseCase) UpdateUserInfoTo(ctx transporthttp.Context) error {
 			ctx,
 			v.ID,
 			accountId,
-			"840028401@qq.com",
-			"wang",
-			"jiabao",
-			"1993-07-14",
-			"M",
-			"CN",
-			"G12345678",
-			"CN-RIC",
+			email,
+			firstName,
+			lastName,
+			dob,
+			gender,
+			nationality,
+			nationalid,
+			idType,
 			addr,
 			fileID,
 			fileIDTwo,
-			"18645139950",
-			"86",
+			phoneNumber,
+			phoneCountryCode,
 		)
 		if nil != err {
 			fmt.Println(err)
