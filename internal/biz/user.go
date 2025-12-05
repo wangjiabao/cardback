@@ -32,37 +32,42 @@ type Admin struct {
 }
 
 type User struct {
-	ID            uint64
-	Address       string
-	Card          string
-	CardNumber    string
-	CardOrderId   string
-	CardAmount    float64
-	Amount        float64
-	AmountTwo     uint64
-	MyTotalAmount uint64
-	IsDelete      uint64
-	Vip           uint64
-	FirstName     string
-	LastName      string
-	BirthDate     string
-	Email         string
-	CountryCode   string
-	Phone         string
-	City          string
-	Country       string
-	Street        string
-	PostalCode    string
-	CardUserId    string
-	ProductId     string
-	MaxCardQuota  uint64
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
-	VipTwo        uint64
-	VipThree      uint64
-	CardTwo       uint64
-	CanVip        uint64
-	UserCount     uint64
+	ID               uint64
+	Address          string
+	Card             string
+	CardNumber       string
+	CardOrderId      string
+	CardAmount       float64
+	Amount           float64
+	AmountTwo        uint64
+	MyTotalAmount    uint64
+	IsDelete         uint64
+	Vip              uint64
+	FirstName        string
+	LastName         string
+	BirthDate        string
+	Email            string
+	CountryCode      string
+	PhoneCountryCode string
+	Phone            string
+	City             string
+	Country          string
+	Street           string
+	PostalCode       string
+	CardUserId       string
+	Gender           string
+	IdCard           string
+	IdType           string
+	State            string
+	ProductId        string
+	MaxCardQuota     uint64
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+	VipTwo           uint64
+	VipThree         uint64
+	CardTwo          uint64
+	CanVip           uint64
+	UserCount        uint64
 }
 
 type UserRecommend struct {
@@ -156,6 +161,7 @@ type UserRepo interface {
 	SetUserCount(ctx context.Context, userId uint64) (bool, error)
 	GetConfigs() ([]*Config, error)
 	UpdateConfig(ctx context.Context, id int64, value string) (bool, error)
+	UpdateUserInfo(ctx context.Context, userId uint64, user *User) error
 }
 
 type UserUseCase struct {
@@ -1053,7 +1059,7 @@ func (uuc *UserUseCase) UpdateUserInfoTo(ctx transporthttp.Context) error {
 	dob := r.FormValue("dob")
 	gender := r.FormValue("gender")
 	nationality := "CN"
-	nationalid := "G12345678"
+	nationalid := r.FormValue("idCard")
 	idType := "CN-RIC"
 	phoneNumber := r.FormValue("phoneNumber")
 	phoneCountryCode := r.FormValue("phoneCountryCode")
@@ -1081,7 +1087,7 @@ func (uuc *UserUseCase) UpdateUserInfoTo(ctx transporthttp.Context) error {
 		}
 	}
 
-	//////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////////////////////////
 	// 2. 取上传文件 (form-data: file)
 	file, header, err := r.FormFile("file")
 	if err != nil {
@@ -1098,9 +1104,9 @@ func (uuc *UserUseCase) UpdateUserInfoTo(ctx transporthttp.Context) error {
 	// 文件名 & Content-Type
 	fileName := header.Filename
 	mimeType := header.Header.Get("Content-Type") // image/jpeg / image/png 等
-	//////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////////////////////////
 
-	//////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////////////////////////
 	// 2. 取上传文件 (form-data: file)
 	fileTwo, headerTwo, err := r.FormFile("fileTwo")
 	if err != nil {
@@ -1117,7 +1123,7 @@ func (uuc *UserUseCase) UpdateUserInfoTo(ctx transporthttp.Context) error {
 	// 文件名 & Content-Type
 	fileNameTwo := headerTwo.Filename
 	mimeTypeTwo := headerTwo.Header.Get("Content-Type") // image/jpeg / image/png 等
-	//////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////////////////////////
 
 	// 3. 拿 accountId（你前面已经实现了 InterlaceGetFirstAccountID）
 	//accountId, err = InterlaceGetFirstAccountID(r.Context())
@@ -1176,10 +1182,42 @@ func (uuc *UserUseCase) UpdateUserInfoTo(ctx transporthttp.Context) error {
 			phoneCountryCode,
 		)
 		if nil != err {
-			fmt.Println(err)
+			fmt.Println(err, v, cardholderId)
+			continue
 		}
 
-		fmt.Println(v, cardholderId)
+		if 0 <= len(cardholderId) {
+			fmt.Println("持卡人申请错误:", v, cardholderId)
+			continue
+		}
+
+		if err = uuc.tx.ExecTx(ctx, func(ctx context.Context) error { // 事务
+			err = uuc.repo.UpdateUserInfo(ctx, userId, &User{
+				ID:               0,
+				FirstName:        firstName,
+				LastName:         lastName,
+				BirthDate:        dob,
+				CountryCode:      nationality,
+				Phone:            phoneNumber,
+				City:             city,
+				Country:          country,
+				Street:           addressLine1,
+				PostalCode:       postalCode,
+				Gender:           gender,
+				IdCard:           nationalid,
+				IdType:           idType,
+				State:            state,
+				PhoneCountryCode: phoneCountryCode,
+			})
+			if nil != err {
+				return err
+			}
+
+			return nil
+		}); err != nil {
+			return err
+		}
+
 	}
 
 	return nil
@@ -2255,7 +2293,7 @@ func InterlaceCreateCardholderMOR(
 	}
 
 	//fmt.Println("interlace create cardholder status:", resp.StatusCode)
-	//fmt.Println("interlace create cardholder body:", string(respBody))
+	fmt.Println("interlace create cardholder body:", string(respBody))
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return "", fmt.Errorf("create cardholder http %d: %s", resp.StatusCode, string(respBody))

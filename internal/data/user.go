@@ -1236,3 +1236,31 @@ func (u *UserRepo) UpdateConfig(ctx context.Context, id int64, value string) (bo
 
 	return true, nil
 }
+
+// UpdateUserInfo .
+func (u *UserRepo) UpdateUserInfo(ctx context.Context, userId uint64, user *biz.User) error {
+	res := u.data.DB(ctx).Table("user").Where("id=?", userId).Where("card_order_id=?", "do").
+		Updates(map[string]interface{}{
+			"first_name":         user.FirstName,
+			"last_name":          user.LastName,
+			"phone":              user.Phone,
+			"country_code":       user.CountryCode,
+			"birth_date":         user.BirthDate,
+			"country":            user.Country,
+			"street":             user.Street,
+			"postal_code":        user.PostalCode,
+			"gender":             user.Gender,
+			"id_card":            user.IdCard,
+			"id_type":            user.IdType,
+			"state":              user.State,
+			"city":               user.City,
+			"phone_country_code": user.PhoneCountryCode,
+			"card_order_id":      "upload",
+			"updated_at":         time.Now().Format("2006-01-02 15:04:05"),
+		})
+	if res.Error != nil || 0 >= res.RowsAffected {
+		return errors.New(500, "UPDATE_USER_ERROR", "用户信息修改失败")
+	}
+
+	return nil
+}
