@@ -1692,11 +1692,17 @@ func QueryCardHolderWithSign(holderId uint64, productId uint64) (*QueryCardHolde
 // ================= Interlace 授权配置 & 缓存 =================
 
 const (
-	interlaceBaseURL      = "https://api-sandbox.interlace.money/open-api/v3"
-	interlaceBaseURLV1    = "https://api-sandbox.interlace.money/open-api/v1"
-	interlaceClientID     = "interlacedc0330757f216112"
-	interlaceClientSecret = "c0d8019217ad4903bf09336320a4ddd9" // v3 的接口目前用不到 secret，但建议以后放到配置/环境变量
-	interlaceAccountId    = "cb6c8028-c828-4596-a501-6fa3196af4d7"
+	interlaceBaseURL      = "https://api.interlace.money/open-api/v3"
+	interlaceBaseURLV1    = "https://api.interlace.money/open-api/v1"
+	interlaceClientID     = "interlace88184533913f9df8"
+	interlaceClientSecret = "2a664a342ea2453288ac00a09381675b" // v3 的接口目前用不到 secret，但建议以后放到配置/环境变量
+	interlaceAccountId    = "c9748bd0-ec88-4fe0-9d22-8a535243bc28"
+
+	//interlaceBaseURL      = "https://api-sandbox.interlace.money/open-api/v3"
+	//interlaceBaseURLV1    = "https://api-sandbox.interlace.money/open-api/v1"
+	//interlaceClientID     = "interlacedc0330757f216112"
+	//interlaceClientSecret = "c0d8019217ad4903bf09336320a4ddd9" // v3 的接口目前用不到 secret，但建议以后放到配置/环境变量
+	//interlaceAccountId    = "cb6c8028-c828-4596-a501-6fa3196af4d7"
 )
 
 // 缓存在当前进程里，如果你将来多实例部署/重启频繁，可以再扩展成 Redis 存储
@@ -2517,7 +2523,7 @@ func InterlaceListCards(ctx context.Context, in *InterlaceListCardsReq) ([]*Inte
 		return nil, 0, err
 	}
 
-	base := interlaceBaseURL + "/open-api/v3/card-list"
+	base := interlaceBaseURL + "/card-list"
 
 	q := url.Values{}
 	q.Set("accountId", in.AccountId)
