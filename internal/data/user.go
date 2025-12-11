@@ -113,6 +113,35 @@ type EthUserRecord struct {
 	Last      int64     `gorm:"type:int;not null"`
 }
 
+type Card struct {
+	ID uint64 `gorm:"primarykey;type:int"`
+
+	CardID       string `gorm:"type:varchar(100);not null"`             // interlace 的 id
+	AccountID    string `gorm:"type:varchar(100);not null"`             // accountId
+	CardholderID string `gorm:"type:varchar(100);not null;default:'0'"` // cardholderId
+	BalanceID    string `gorm:"type:varchar(100);not null;default:'0'"` // balanceId
+	BudgetID     string `gorm:"type:varchar(100);not null;default:'0'"` // budgetId
+	ReferenceID  string `gorm:"type:varchar(100);not null;default:'0'"` // referenceId
+
+	UserName string `gorm:"type:varchar(100);not null;default:'no'"` // userName
+	Currency string `gorm:"type:varchar(20);not null;default:'no'"`  // currency
+	Bin      string `gorm:"type:varchar(20);not null;default:'no'"`  // bin
+
+	Status   string `gorm:"type:varchar(45);not null;default:'PENDING'"`      // 状态
+	CardMode string `gorm:"type:varchar(45);not null;default:'VIRTUAL_CARD'"` // 模式
+	Label    string `gorm:"type:varchar(100);not null;default:'no'"`          // 标签
+
+	CardLastFour string `gorm:"type:varchar(10);not null;default:'no'"` // 后四位
+
+	// Interlace 的创建时间，用毫秒时间戳存
+	InterlaceCreateTime int64 `gorm:"type:bigint;not null"` // createTime(ms)
+	UserId              int64 `gorm:"type:int;not null"`    // createTime(ms)
+
+	CreatedAt time.Time `gorm:"type:datetime;not null"`
+	UpdatedAt time.Time `gorm:"type:datetime;not null"`
+	IsDelete  uint32    `gorm:"type:int;not null;default:0"`
+}
+
 type UserRepo struct {
 	data *Data
 	log  *log.Helper
@@ -1260,6 +1289,129 @@ func (u *UserRepo) UpdateUserInfo(ctx context.Context, userId uint64, user *biz.
 		})
 	if res.Error != nil || 0 >= res.RowsAffected {
 		return errors.New(500, "UPDATE_USER_ERROR", "用户信息修改失败")
+	}
+
+	return nil
+}
+
+// GetLatestCard 按 InterlaceCreateTime 倒序取最新一条
+func (u *UserRepo) GetLatestCard(ctx context.Context) (*biz.Card, error) {
+	var c Card
+
+	instance := u.data.DB(ctx).Table("card").
+		Order("id DESC").
+		Limit(1)
+
+	if err := instance.First(&c).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// 没有就返回 nil, nil，或者你习惯的 NotFound 错误
+			return nil, nil
+		}
+		return nil, errors.New(500, "CARD_ERROR", err.Error())
+	}
+
+	res := &biz.Card{
+		ID:                  c.ID,
+		CardID:              c.CardID,
+		AccountID:           c.AccountID,
+		CardholderID:        c.CardholderID,
+		BalanceID:           c.BalanceID,
+		BudgetID:            c.BudgetID,
+		ReferenceID:         c.ReferenceID,
+		UserName:            c.UserName,
+		Currency:            c.Currency,
+		Bin:                 c.Bin,
+		Status:              c.Status,
+		CardMode:            c.CardMode,
+		Label:               c.Label,
+		CardLastFour:        c.CardLastFour,
+		InterlaceCreateTime: c.InterlaceCreateTime,
+		CreatedAt:           c.CreatedAt,
+		UpdatedAt:           c.UpdatedAt,
+		UserId:              c.UserId,
+	}
+
+	return res, nil
+}
+
+// GetCardPage 分页查询卡片
+func (u *UserRepo) GetCardPage(ctx context.Context, b *biz.Pagination, accountId, status string) ([]*biz.Card, error, int64) {
+	var (
+		count int64
+		list  []*Card
+	)
+
+	res := make([]*biz.Card, 0)
+
+	instance := u.data.db.Table("card").
+		Order("id DESC")
+
+	if accountId != "" {
+		instance = instance.Where("account_id = ?", accountId)
+	}
+	if status != "" {
+		instance = instance.Where("status = ?", status)
+	}
+
+	instance = instance.Count(&count)
+
+	if err := instance.Scopes(Paginate(b.PageNum, b.PageSize)).Find(&list).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return res, errors.NotFound("CARD_NOT_FOUND", "card not found"), 0
+		}
+		return nil, errors.New(500, "CARD_ERROR", err.Error()), 0
+	}
+
+	for _, c := range list {
+		res = append(res, &biz.Card{
+			ID:                  c.ID,
+			CardID:              c.CardID,
+			AccountID:           c.AccountID,
+			CardholderID:        c.CardholderID,
+			BalanceID:           c.BalanceID,
+			BudgetID:            c.BudgetID,
+			ReferenceID:         c.ReferenceID,
+			UserName:            c.UserName,
+			Currency:            c.Currency,
+			Bin:                 c.Bin,
+			Status:              c.Status,
+			CardMode:            c.CardMode,
+			Label:               c.Label,
+			CardLastFour:        c.CardLastFour,
+			InterlaceCreateTime: c.InterlaceCreateTime,
+			UserId:              c.UserId,
+			CreatedAt:           c.CreatedAt,
+			UpdatedAt:           c.UpdatedAt,
+		})
+	}
+
+	return res, nil, count
+}
+
+// CreateCardNew 创建一条卡片记录
+func (u *UserRepo) CreateCardNew(ctx context.Context, in *biz.Card) error {
+	var c Card
+
+	c.CardID = in.CardID
+	c.AccountID = in.AccountID
+	c.CardholderID = in.CardholderID
+	c.BalanceID = in.BalanceID
+	c.BudgetID = in.BudgetID
+	c.ReferenceID = in.ReferenceID
+
+	c.UserName = in.UserName
+	c.Currency = in.Currency
+	c.Bin = in.Bin
+	c.Status = in.Status
+	c.CardMode = in.CardMode
+	c.Label = in.Label
+	c.CardLastFour = in.CardLastFour
+
+	c.InterlaceCreateTime = in.InterlaceCreateTime
+
+	resInsert := u.data.DB(ctx).Table("card").Create(&c)
+	if resInsert.Error != nil || resInsert.RowsAffected <= 0 {
+		return errors.New(500, "CREATE_CARD_ERROR", "卡片信息创建失败")
 	}
 
 	return nil

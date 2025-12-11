@@ -96,6 +96,27 @@ type Withdraw struct {
 	UpdatedAt time.Time
 }
 
+type Card struct {
+	ID                  uint64
+	CardID              string
+	AccountID           string
+	CardholderID        string
+	BalanceID           string
+	BudgetID            string
+	ReferenceID         string
+	UserName            string
+	Currency            string
+	Bin                 string
+	Status              string
+	CardMode            string
+	Label               string
+	CardLastFour        string
+	InterlaceCreateTime int64
+	UserId              int64
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
+}
+
 type Reward struct {
 	ID        uint64
 	UserId    uint64
@@ -162,6 +183,9 @@ type UserRepo interface {
 	GetConfigs() ([]*Config, error)
 	UpdateConfig(ctx context.Context, id int64, value string) (bool, error)
 	UpdateUserInfo(ctx context.Context, userId uint64, user *User) error
+	CreateCardNew(ctx context.Context, in *Card) error
+	GetCardPage(ctx context.Context, b *Pagination, accountId, status string) ([]*Card, error, int64)
+	GetLatestCard(ctx context.Context) (*Card, error)
 }
 
 type UserUseCase struct {
@@ -1225,24 +1249,136 @@ func (uuc *UserUseCase) UpdateUserInfoTo(ctx transporthttp.Context) error {
 }
 
 func (uuc *UserUseCase) UpdateAllCard(ctx context.Context, req *pb.UpdateAllCardRequest) (*pb.UpdateAllCardReply, error) {
-	for i := 1; i < 10; i++ {
-		cards, total, err := InterlaceListCards(ctx, &InterlaceListCardsReq{
+	const (
+		pageSize = 100
+		maxPages = 200
+	)
+
+	// 1. 先从数据库拿最新一条卡片（按 InterlaceCreateTime 倒序）
+	latest, err := uuc.repo.GetLatestCard(ctx)
+	if err != nil {
+		fmt.Println("GetLatestCard error:", err)
+		return nil, err
+	}
+
+	var lastCreateTime int64
+	var lastCardID string
+	if latest != nil {
+		lastCreateTime = latest.InterlaceCreateTime
+		lastCardID = latest.CardID
+	}
+
+	// 用来收集本次拉到的“新卡片”（按接口返回顺序：最新在前）
+	newCards := make([]*InterlaceCard, 0, pageSize)
+
+	stop := false
+
+	// 2. 从第 1 页开始，最多扫 200 页（真实业务量远小于这个）
+	for page := 1; page <= maxPages; page++ {
+		cards, _, errTwo := InterlaceListCards(ctx, &InterlaceListCardsReq{
 			AccountId: interlaceAccountId,
-			Page:      i,
-			Limit:     100,
+			Page:      page,
+			Limit:     pageSize,
 		})
-		if err != nil {
-			fmt.Println("InterlaceListCards error:", err)
-			continue
+		if errTwo != nil {
+			fmt.Println("InterlaceListCards page", page, "error:", errTwo)
+			// 出错就整体结束本次同步，避免老数据乱插
+			break
 		}
 
-		fmt.Println("cards total:", total)
+		if len(cards) == 0 {
+			// 没有更多数据了
+			break
+		}
+
 		for _, c := range cards {
-			fmt.Println(c)
+			// 如果本地还没有任何卡片记录，直接全部当作新卡收集
+			if lastCreateTime == 0 {
+				newCards = append(newCards, c)
+				continue
+			}
+
+			// 规则：
+			// 如果 createTime >= lastCreateTime 且 CardID != lastCardID → 收集
+			// 否则 break，说明已经对齐到旧数据
+
+			var tmpCreateTime int64
+			tmpCreateTime, err = strconv.ParseInt(c.CreateTime, 10, 64)
+			if 0 >= tmpCreateTime || nil != err {
+				fmt.Println("InterlaceListCards create time", c, "error:", errTwo)
+				// 出错就整体结束本次同步，避免老数据乱插
+				break
+			}
+
+			if tmpCreateTime >= lastCreateTime && c.ID != lastCardID {
+				newCards = append(newCards, c)
+				continue
+			}
+
+			// 进入这里说明：
+			//  - c.CreateTime < lastCreateTime，或者
+			//  - c.CreateTime == lastCreateTime 且 c.ID == lastCardID（精确对齐到最新一条）
+			// 说明后面都更旧，不需要再看，直接整体结束
+			stop = true
+			break
+		}
+
+		if stop {
+			break
+		}
+
+		// 这一页不足 pageSize，说明已经到底了
+		if len(cards) < pageSize {
+			break
 		}
 	}
 
-	return nil, nil
+	if len(newCards) == 0 {
+		fmt.Println("no new cards")
+		return &pb.UpdateAllCardReply{}, nil
+	}
+
+	// 3. 反转 newCards，让“最旧的在前、最新的在后”
+	// 这样插入 DB 时，自动增长 ID 会保证最新的在最后一条，方便下次查“最新一条”
+	for i, j := 0, len(newCards)-1; i < j; i, j = i+1, j-1 {
+		newCards[i], newCards[j] = newCards[j], newCards[i]
+	}
+
+	// 4. 统一插入数据库（这里用 CreateCard 单条插入，你要批量插入也可以搞个 Batch 接口）
+	for _, ic := range newCards {
+		var tmpCreateTime int64
+		tmpCreateTime, err = strconv.ParseInt(ic.CreateTime, 10, 64)
+		if 0 >= tmpCreateTime || nil != err {
+			fmt.Println("InterlaceListCards create time", ic, "error:", err)
+			// 出错就整体结束本次同步，避免老数据乱插
+			break
+		}
+
+		card := &Card{
+			CardID:              ic.ID,
+			AccountID:           ic.AccountID,
+			CardholderID:        ic.CardholderID,
+			BalanceID:           ic.BalanceID,
+			BudgetID:            ic.BudgetID,
+			ReferenceID:         ic.ReferenceID,
+			UserName:            ic.UserName,
+			Currency:            ic.Currency,
+			Bin:                 ic.Bin,
+			Status:              ic.Status,
+			CardMode:            ic.CardMode,
+			Label:               ic.Label,
+			CardLastFour:        ic.CardLastFour,
+			InterlaceCreateTime: tmpCreateTime, // 注意：这里是毫秒时间戳
+		}
+
+		if errTwo := uuc.repo.CreateCardNew(ctx, card); errTwo != nil {
+			fmt.Println("CreateCard error, cardID =", ic.ID, "err =", err)
+			// 这里我选择 continue，尽量插入后面的；你要严格一点也可以直接 return
+			continue
+		}
+	}
+
+	return &pb.UpdateAllCardReply{}, nil
 }
 
 func (uuc *UserUseCase) UpdateCanVip(ctx context.Context, req *pb.UpdateCanVipRequest) (*pb.UpdateCanVipReply, error) {
