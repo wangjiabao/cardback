@@ -1225,7 +1225,7 @@ func (uuc *UserUseCase) UpdateUserInfoTo(ctx transporthttp.Context) error {
 }
 
 func (uuc *UserUseCase) UpdateAllCard(ctx context.Context, req *pb.UpdateAllCardRequest) (*pb.UpdateAllCardReply, error) {
-	for i := 1; i < 5; i++ {
+	for i := 1; i < 10; i++ {
 		cards, total, err := InterlaceListCards(ctx, &InterlaceListCardsReq{
 			AccountId: interlaceAccountId,
 			Page:      i,
@@ -1238,7 +1238,7 @@ func (uuc *UserUseCase) UpdateAllCard(ctx context.Context, req *pb.UpdateAllCard
 
 		fmt.Println("cards total:", total)
 		for _, c := range cards {
-			fmt.Println("cardID=%s last4=%s status=%s mode=%s\n", c.ID, c.CardLastFour, c.Status, c.CardMode)
+			fmt.Println(c)
 		}
 	}
 
@@ -2503,18 +2503,18 @@ type InterlaceTransactionLimit struct {
 }
 
 // InterlaceListCards 使用 x-access-token + accountId 获取卡片列表
-func InterlaceListCards(ctx context.Context, in *InterlaceListCardsReq) ([]*InterlaceCard, int64, error) {
+func InterlaceListCards(ctx context.Context, in *InterlaceListCardsReq) ([]*InterlaceCard, string, error) {
 	if in == nil {
-		return nil, 0, fmt.Errorf("list cards req is nil")
+		return nil, "", fmt.Errorf("list cards req is nil")
 	}
 	if in.AccountId == "" {
-		return nil, 0, fmt.Errorf("accountId is required")
+		return nil, "", fmt.Errorf("accountId is required")
 	}
 
 	accessToken, err := GetInterlaceAccessToken(ctx)
 	if err != nil || accessToken == "" {
 		fmt.Println("获取access token错误")
-		return nil, 0, err
+		return nil, "", err
 	}
 
 	base := interlaceBaseURL + "/card-list"
@@ -2553,7 +2553,7 @@ func InterlaceListCards(ctx context.Context, in *InterlaceListCardsReq) ([]*Inte
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, urlStr, nil)
 	if err != nil {
-		return nil, 0, err
+		return nil, "", err
 	}
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("x-access-token", accessToken)
@@ -2561,17 +2561,17 @@ func InterlaceListCards(ctx context.Context, in *InterlaceListCardsReq) ([]*Inte
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, 0, err
+		return nil, "", err
 	}
 	defer resp.Body.Close()
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return nil, 0, err
+		return nil, "", err
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, 0, fmt.Errorf("interlace list cards http %d: %s", resp.StatusCode, string(body))
+		return nil, "", fmt.Errorf("interlace list cards http %d: %s", resp.StatusCode, string(body))
 	}
 
 	// 外层通用结构：code/message/data
@@ -2585,10 +2585,10 @@ func InterlaceListCards(ctx context.Context, in *InterlaceListCardsReq) ([]*Inte
 	}
 
 	if err := json.Unmarshal(body, &outer); err != nil {
-		return nil, 0, fmt.Errorf("list cards unmarshal: %w", err)
+		return nil, "", fmt.Errorf("list cards unmarshal: %w", err)
 	}
 	if outer.Code != "000000" {
-		return nil, 0, fmt.Errorf("list cards failed: code=%s msg=%s", outer.Code, outer.Message)
+		return nil, "", fmt.Errorf("list cards failed: code=%s msg=%s", outer.Code, outer.Message)
 	}
 
 	cards := make([]*InterlaceCard, 0, len(outer.Data.List))
