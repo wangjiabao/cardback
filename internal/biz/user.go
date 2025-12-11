@@ -1396,6 +1396,7 @@ func (uuc *UserUseCase) UpdateAllCardTwo(ctx context.Context, req *pb.UpdateAllC
 		}
 
 		for _, ic := range cards {
+			fmt.Println(ic)
 			// 只保留 ACTIVE
 			if ic.Status != "ACTIVE" {
 				continue
@@ -2421,8 +2422,8 @@ func InterlaceCreateCardholderMOR(
 	email string,
 	firstName string,
 	lastName string,
-	dob string,         // YYYY-MM-DD
-	gender string,      // "M" / "F"
+	dob string, // YYYY-MM-DD
+	gender string, // "M" / "F"
 	nationality string, // ISO2, e.g. "CN"
 	nationalId string,
 	idType string, // "CN-RIC" / "PASSPORT" / ...
