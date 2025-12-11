@@ -62,6 +62,7 @@ type CardTwo struct {
 	State            string    `gorm:"type:varchar(45);not null;default:'no'"`
 	Status           uint64    `gorm:"type:int"`
 	CardId           string    `gorm:"type:varchar(100);not null;default:'no'"`
+	CardAmount       float64   `gorm:"type:decimal(65,20);not null"`
 	CreatedAt        time.Time `gorm:"type:datetime;not null"`
 	UpdatedAt        time.Time `gorm:"type:datetime;not null"`
 }
@@ -1561,6 +1562,7 @@ func (u *UserRepo) GetCardTwoStatusOne() ([]*biz.CardTwo, error) {
 			CardId:           c.CardId,
 			CreatedAt:        c.CreatedAt,
 			UpdatedAt:        c.UpdatedAt,
+			CardAmount:       c.CardAmount,
 		})
 	}
 

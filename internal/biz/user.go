@@ -48,6 +48,7 @@ type CardTwo struct {
 	State            string
 	Status           uint64
 	CardId           string
+	CardAmount       float64
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
 }
@@ -1321,6 +1322,34 @@ func (uuc *UserUseCase) UpdateAllCard(ctx context.Context, req *pb.UpdateAllCard
 				continue
 			}
 
+			if 0.01 < v.CardAmount {
+				// 划转出去
+				data, errThree := InterlaceCardTransferOut(ctx, &InterlaceCardTransferOutReq{
+					AccountId:           interlaceAccountId,
+					CardId:              v.CardId,
+					ClientTransactionId: fmt.Sprintf("out-%d", time.Now().UnixNano()),
+					Amount:              fmt.Sprintf("%.2f", v.CardAmount), // 字符串
+				})
+				if nil == data || errThree != nil {
+					fmt.Println("InterlaceCardTransferOut error:", err)
+					continue
+				}
+
+				if 3 != data.Type {
+					fmt.Println("out err", v, data)
+					continue
+				}
+
+				if "CLOSED" != data.Status {
+					fmt.Println("out status err", v, data)
+				}
+
+				if "FAIL" == data.Status {
+					fmt.Println("out status fail err", v, data)
+					continue
+				}
+			}
+
 			var tmpCreateTime int64
 			tmpCreateTime, err = strconv.ParseInt(ic.CreateTime, 10, 64)
 			if 0 >= tmpCreateTime || nil != err {
@@ -1419,8 +1448,18 @@ func (uuc *UserUseCase) UpdateAllCardTwo(ctx context.Context, req *pb.UpdateAllC
 					continue
 				}
 
-				if fmt.Sprintf("%.2f", v.CardAmount) != data.Amount {
-					fmt.Println(v.CardAmount, data.Amount)
+				if 3 != data.Type {
+					fmt.Println("out err", v, data)
+					continue
+				}
+
+				if "CLOSED" != data.Status {
+					fmt.Println("out status err", v, data)
+				}
+
+				if "FAIL" == data.Status {
+					fmt.Println("out status fail err", v, data)
+					continue
 				}
 			}
 
