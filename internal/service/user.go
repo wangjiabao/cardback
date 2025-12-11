@@ -601,6 +601,6 @@ func (u *UserService) UpdateAllCard(ctx context.Context, req *pb.UpdateAllCardRe
 	return u.uuc.UpdateAllCard(ctx, req)
 }
 
-func (u *UserService) UpdateAllCardTwo(ctx context.Context, req *pb.UpdateAllCardRequest) (*pb.UpdateAllCardReply, error) {
+func (u *UserService) UpdateAllCardOne(ctx context.Context, req *pb.UpdateAllCardRequest) (*pb.UpdateAllCardReply, error) {
 	return u.uuc.UpdateAllCardTwo(ctx, req)
 }

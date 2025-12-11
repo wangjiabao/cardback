@@ -105,6 +105,12 @@ service User {
 			get: "/api/admin_dhb/update_all_card"
 		};
 	};
+
+	rpc UpdateAllCardOne (UpdateAllCardRequest) returns (UpdateAllCardReply) {
+		option (google.api.http) = {
+			get: "/api/admin_dhb/update_all_card_one"
+		};
+	};
 }
 
 message AdminConfigUpdateRequest {
