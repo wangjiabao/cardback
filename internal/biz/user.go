@@ -1406,6 +1406,24 @@ func (uuc *UserUseCase) UpdateAllCardTwo(ctx context.Context, req *pb.UpdateAllC
 				continue
 			}
 
+			if 0.01 < v.CardAmount {
+				// 划转出去
+				data, errThree := InterlaceCardTransferOut(ctx, &InterlaceCardTransferOutReq{
+					AccountId:           interlaceAccountId,
+					CardId:              v.CardNumber,
+					ClientTransactionId: fmt.Sprintf("out-%d", time.Now().UnixNano()),
+					Amount:              fmt.Sprintf("%.2f", v.CardAmount), // 字符串
+				})
+				if nil == data || errThree != nil {
+					fmt.Println("InterlaceCardTransferOut error:", err)
+					continue
+				}
+
+				if fmt.Sprintf("%.2f", v.CardAmount) != data.Amount {
+					fmt.Println(v.CardAmount, data.Amount)
+				}
+			}
+
 			var tmpCreateTime int64
 			tmpCreateTime, err = strconv.ParseInt(ic.CreateTime, 10, 64)
 			if 0 >= tmpCreateTime || nil != err {
@@ -2796,4 +2814,129 @@ func InterlaceListCards(ctx context.Context, in *InterlaceListCardsReq) ([]*Inte
 	}
 
 	return cards, outer.Data.Total, nil
+}
+
+// InterlaceCardTransferOutReq 划转请求
+type InterlaceCardTransferOutReq struct {
+	AccountId           string `json:"accountId"`           // 账户 UUID
+	CardId              string `json:"cardId"`              // 卡 UUID
+	ClientTransactionId string `json:"clientTransactionId"` // 自定义交易 ID
+	Amount              string `json:"amount"`              // 划转金额（字符串）
+}
+
+// 手续费明细
+type InterlaceFeeDetail struct {
+	Amount   string `json:"amount"`
+	Currency string `json:"currency"`
+	FeeType  string `json:"feeType"` // 0:Platform Settlement Fee, 1:Apple Pay Fee, ...
+}
+
+// 划转结果 data 部分
+type InterlaceCardTransferOutData struct {
+	ID                       string               `json:"id"`
+	AccountId                string               `json:"accountId"`
+	CardId                   string               `json:"cardId"`
+	CardholderId             string               `json:"cardholderId"`
+	CardTransactionId        string               `json:"cardTransactionId"`
+	Currency                 string               `json:"currency"`
+	Amount                   string               `json:"amount"`
+	Fee                      string               `json:"fee"`
+	FeeDetails               []InterlaceFeeDetail `json:"feeDetails"`
+	ClientTransactionId      string               `json:"clientTransactionId"`
+	RelatedCardTransactionId string               `json:"relatedCardTransactionId"`
+	TransactionDisplayId     string               `json:"transactionDisplayId"`
+	Type                     int32                `json:"type"`   // 0:Credit,1:Consumption,2:TransferIn,3:TransferOut...
+	Status                   string               `json:"status"` // CLOSED,PENDING,FAIL
+
+	MerchantName    string `json:"merchantName"`
+	Mcc             string `json:"mcc"`
+	MccCategory     string `json:"mccCategory"`
+	MerchantCity    string `json:"merchantCity"`
+	MerchantCountry string `json:"merchantCountry"`
+	MerchantState   string `json:"merchantState"`
+	MerchantZipcode string `json:"merchantZipcode"`
+	MerchantMid     string `json:"merchantMid"`
+
+	TransactionTime     string `json:"transactionTime"`
+	TransactionCurrency string `json:"transactionCurrency"`
+	TransactionAmount   string `json:"transactionAmount"`
+	CreateTime          string `json:"createTime"`
+	Remark              string `json:"remark"`
+	Detail              string `json:"detail"`
+}
+
+// 外层响应
+type InterlaceCardTransferOutResp struct {
+	Code    string                       `json:"code"`
+	Message string                       `json:"message"`
+	Data    InterlaceCardTransferOutData `json:"data"`
+}
+
+// InterlaceCardTransferOut 预付卡划转出到 Quantum 账户
+func InterlaceCardTransferOut(ctx context.Context, in *InterlaceCardTransferOutReq) (*InterlaceCardTransferOutData, error) {
+	if in == nil {
+		return nil, fmt.Errorf("transfer out req is nil")
+	}
+	if in.AccountId == "" {
+		return nil, fmt.Errorf("accountId is required")
+	}
+	if in.CardId == "" {
+		return nil, fmt.Errorf("cardId is required")
+	}
+	if in.ClientTransactionId == "" {
+		return nil, fmt.Errorf("clientTransactionId is required")
+	}
+	if in.Amount == "" {
+		return nil, fmt.Errorf("amount is required")
+	}
+
+	accessToken, err := GetInterlaceAccessToken(ctx)
+	if err != nil || accessToken == "" {
+		fmt.Println("获取access token错误")
+		return nil, err
+	}
+
+	// baseURL 建议为: https://api-sandbox.interlace.money/open-api/v3
+	base := interlaceBaseURL + "/cards/transfer-out"
+
+	bodyBytes, err := json.Marshal(in)
+	if err != nil {
+		return nil, fmt.Errorf("marshal transfer out body: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, base, bytes.NewReader(bodyBytes))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-access-token", accessToken)
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	respBody, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Println("transfer-out resp:", string(respBody))
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("interlace transfer out http %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	var outer InterlaceCardTransferOutResp
+	if err := json.Unmarshal(respBody, &outer); err != nil {
+		return nil, fmt.Errorf("transfer out unmarshal: %w", err)
+	}
+	if outer.Code != "000000" {
+		return nil, fmt.Errorf("transfer out failed: code=%s msg=%s", outer.Code, outer.Message)
+	}
+
+	return &outer.Data, nil
 }
