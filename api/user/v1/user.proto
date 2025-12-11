@@ -224,12 +224,10 @@ message AdminUserListReply { // 用户信息
 		uint64 canVip = 7; // 允许app设置级别，0不允许，1允许
 		uint64 vipThree = 9; // 实体卡分红级别，3省，2市，1区
 		uint64 historyRecommend = 6; // 直推人数
-		string card = 10; // 卡片id
-		string cardNumber = 11; // 卡号
-		string cardOrderId = 14; // 开卡订单号
-		uint64 userCount = 15; // 开卡失败次数
-		uint64 vipTwo = 16; // 区域，0老区，30新区
-		uint64 cardTwo = 17; // 实体卡提交状态，0未提交，1已提交
+		string cardNumber = 10; // 虚拟卡片id
+		string cardTwoNumber = 11; // 实体卡片id
+		string cardOrderId = 14; // 虚拟卡开卡状态，"no"未申请， "do"申请，"doing"已提交上游，"success"成功
+		uint64 cardTwo = 17; // 实体卡提交上游状态，0未提交，1已提交，2成功
 	}
 
 	int64 count = 2;

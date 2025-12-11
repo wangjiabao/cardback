@@ -17,6 +17,7 @@ type User struct {
 	Card          string    `gorm:"type:varchar(100);not null;default:'no'"`
 	CardOrderId   string    `gorm:"type:varchar(100);not null;default:'no'"`
 	CardNumber    string    `gorm:"type:varchar(100);not null;default:'no'"`
+	CardTwoNumber string    `gorm:"type:varchar(100);not null;default:'no'"`
 	CardAmount    float64   `gorm:"type:decimal(65,20);not null"`
 	Amount        float64   `gorm:"type:decimal(65,20)"`
 	IsDelete      uint64    `gorm:"type:int"`
@@ -1223,6 +1224,7 @@ func (u *UserRepo) GetUsers(b *biz.Pagination, address string) ([]*biz.User, err
 			CanVip:        user.CanVip,
 			CardTwo:       user.CardTwo,
 			UserCount:     user.UserCount,
+			CardTwoNumber: user.CardTwoNumber,
 		})
 	}
 	return res, nil, count

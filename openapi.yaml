@@ -462,15 +462,11 @@ components:
                     type: string
                 historyRecommend:
                     type: string
-                card:
-                    type: string
                 cardNumber:
                     type: string
+                cardTwoNumber:
+                    type: string
                 cardOrderId:
-                    type: string
-                userCount:
-                    type: string
-                vipTwo:
                     type: string
                 cardTwo:
                     type: string
