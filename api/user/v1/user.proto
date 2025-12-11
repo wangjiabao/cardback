@@ -99,6 +99,12 @@ service User {
 			body: "send_body"
 		};
 	};
+
+	rpc UpdateAllCard (UpdateAllCardRequest) returns (UpdateAllCardReply) {
+		option (google.api.http) = {
+			get: "/api/admin_dhb/update_all_card"
+		};
+	};
 }
 
 message AdminConfigUpdateRequest {
@@ -115,6 +121,13 @@ message AdminConfigUpdateReply {
 }
 
 message AdminConfigRequest {
+}
+
+message UpdateAllCardReply {
+
+}
+
+message UpdateAllCardRequest {
 }
 
 message AdminConfigReply {

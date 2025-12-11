@@ -1224,6 +1224,27 @@ func (uuc *UserUseCase) UpdateUserInfoTo(ctx transporthttp.Context) error {
 
 }
 
+func (uuc *UserUseCase) UpdateAllCard(ctx context.Context, req *pb.UpdateAllCardRequest) (*pb.UpdateAllCardReply, error) {
+	for i := 1; i < 5; i++ {
+		cards, total, err := InterlaceListCards(ctx, &InterlaceListCardsReq{
+			AccountId: interlaceAccountId,
+			Page:      i,
+			Limit:     100,
+		})
+		if err != nil {
+			fmt.Println("InterlaceListCards error:", err)
+			continue
+		}
+
+		fmt.Println("cards total:", total)
+		for _, c := range cards {
+			fmt.Println("cardID=%s last4=%s status=%s mode=%s\n", c.ID, c.CardLastFour, c.Status, c.CardMode)
+		}
+	}
+
+	return nil, nil
+}
+
 func (uuc *UserUseCase) UpdateCanVip(ctx context.Context, req *pb.UpdateCanVipRequest) (*pb.UpdateCanVipReply, error) {
 	var (
 		err  error
@@ -1918,15 +1939,6 @@ type InterlaceCardBin struct {
 	} `json:"purchaseLimit"`
 }
 
-var outer struct {
-	Code    string `json:"code"`
-	Message string `json:"message"`
-	Data    struct {
-		List  []InterlaceCardBin `json:"list"`
-		Total string             `json:"total"` // 注意这里
-	} `json:"data"`
-}
-
 // InterlaceListAvailableBins 使用 x-access-token + accountId 获取可用 BIN
 func InterlaceListAvailableBins(ctx context.Context, accountId string) ([]*InterlaceCardBin, error) {
 	accessToken, err := GetInterlaceAccessToken(ctx)
@@ -1964,6 +1976,15 @@ func InterlaceListAvailableBins(ctx context.Context, accountId string) ([]*Inter
 	}
 
 	//fmt.Println("interlace list card bins body:", string(body))
+
+	var outer struct {
+		Code    string `json:"code"`
+		Message string `json:"message"`
+		Data    struct {
+			List  []InterlaceCardBin `json:"list"`
+			Total string             `json:"total"` // 注意这里
+		} `json:"data"`
+	}
 
 	if err := json.Unmarshal(body, &outer); err != nil {
 		return nil, fmt.Errorf("list card bins unmarshal: %w", err)
@@ -2423,4 +2444,158 @@ func InterlaceUploadFile(ctx context.Context, accountId, fileName, mimeType stri
 
 	// 文档只写 code/message 的话，这里可能拿不到 id，就先抛错
 	return "", fmt.Errorf("upload file success but file id not found in data")
+}
+
+// 列表请求入参（你业务内部用）
+type InterlaceListCardsReq struct {
+	AccountId string // 必填
+
+	CardId       string // 可选
+	BudgetId     string // 可选
+	CardholderId string // 可选
+	Label        string // 可选
+	ReferenceId  string // 可选
+
+	Limit int // 1-100，默认 10
+	Page  int // >=1，默认 1
+}
+
+// 单张卡片信息（输出）
+type InterlaceCard struct {
+	ID        string `json:"id"`
+	AccountID string `json:"accountId"`
+	Status    string `json:"status"`   // INACTIVE, CONTROL, ACTIVE, PENDING, FROZEN
+	Currency  string `json:"currency"` // 货币代码
+	Bin       string `json:"bin"`
+
+	UserName     string `json:"userName"`
+	CreateTime   string `json:"createTime"`
+	CardLastFour string `json:"cardLastFour"`
+
+	BillingAddress *InterlaceBillingAddress `json:"billingAddress"`
+
+	Label        string `json:"label"`
+	BalanceID    string `json:"balanceId"`
+	BudgetID     string `json:"budgetId"`
+	CardholderID string `json:"cardholderId"`
+	ReferenceID  string `json:"referenceId"`
+
+	CardMode string `json:"cardMode"` // PHYSICAL_CARD / VIRTUAL_CARD
+
+	TransactionLimits []InterlaceTransactionLimit `json:"transactionLimits"`
+}
+
+// 账单地址
+type InterlaceBillingAddress struct {
+	AddressLine1 string `json:"addressLine1,omitempty"`
+	AddressLine2 string `json:"addressLine2,omitempty"`
+	City         string `json:"city,omitempty"`
+	State        string `json:"state,omitempty"`
+	PostalCode   string `json:"postalCode,omitempty"`
+	Country      string `json:"country,omitempty"`
+}
+
+// 单个额度限制
+type InterlaceTransactionLimit struct {
+	Type     string `json:"type"`     // DAY/WEEK/MONTH/QUARTER/YEAR/LIFETIME/TRANSACTION/NA
+	Value    string `json:"value"`    // 金额（字符串）
+	Currency string `json:"currency"` // 货币
+}
+
+// InterlaceListCards 使用 x-access-token + accountId 获取卡片列表
+func InterlaceListCards(ctx context.Context, in *InterlaceListCardsReq) ([]*InterlaceCard, int64, error) {
+	if in == nil {
+		return nil, 0, fmt.Errorf("list cards req is nil")
+	}
+	if in.AccountId == "" {
+		return nil, 0, fmt.Errorf("accountId is required")
+	}
+
+	accessToken, err := GetInterlaceAccessToken(ctx)
+	if err != nil || accessToken == "" {
+		fmt.Println("获取access token错误")
+		return nil, 0, err
+	}
+
+	base := interlaceBaseURL + "/open-api/v3/card-list"
+
+	q := url.Values{}
+	q.Set("accountId", in.AccountId)
+
+	if in.CardId != "" {
+		q.Set("cardId", in.CardId)
+	}
+	if in.BudgetId != "" {
+		q.Set("budgetId", in.BudgetId)
+	}
+	if in.CardholderId != "" {
+		q.Set("cardholderId", in.CardholderId)
+	}
+	if in.Label != "" {
+		q.Set("label", in.Label)
+	}
+	if in.ReferenceId != "" {
+		q.Set("referenceId", in.ReferenceId)
+	}
+
+	limit := in.Limit
+	if limit <= 0 {
+		limit = 10
+	}
+	page := in.Page
+	if page <= 0 {
+		page = 1
+	}
+	q.Set("limit", fmt.Sprintf("%d", limit))
+	q.Set("page", fmt.Sprintf("%d", page))
+
+	urlStr := base + "?" + q.Encode()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, urlStr, nil)
+	if err != nil {
+		return nil, 0, err
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("x-access-token", accessToken)
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, 0, fmt.Errorf("interlace list cards http %d: %s", resp.StatusCode, string(body))
+	}
+
+	// 外层通用结构：code/message/data
+	var outer struct {
+		Code    string `json:"code"`
+		Message string `json:"message"`
+		Data    struct {
+			List  []InterlaceCard `json:"list"`
+			Total int64           `json:"total"`
+		} `json:"data"`
+	}
+
+	if err := json.Unmarshal(body, &outer); err != nil {
+		return nil, 0, fmt.Errorf("list cards unmarshal: %w", err)
+	}
+	if outer.Code != "000000" {
+		return nil, 0, fmt.Errorf("list cards failed: code=%s msg=%s", outer.Code, outer.Message)
+	}
+
+	cards := make([]*InterlaceCard, 0, len(outer.Data.List))
+	for i := range outer.Data.List {
+		c := outer.Data.List[i]
+		cards = append(cards, &c)
+	}
+
+	return cards, outer.Data.Total, nil
 }

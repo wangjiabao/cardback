@@ -31,6 +31,7 @@ const OperationUserOpenCardHandle = "/api.user.v1.User/OpenCardHandle"
 const OperationUserRewardCardTwo = "/api.user.v1.User/RewardCardTwo"
 const OperationUserSetUserCount = "/api.user.v1.User/SetUserCount"
 const OperationUserSetVipThree = "/api.user.v1.User/SetVipThree"
+const OperationUserUpdateAllCard = "/api.user.v1.User/UpdateAllCard"
 const OperationUserUpdateCanVip = "/api.user.v1.User/UpdateCanVip"
 const OperationUserUpdateUserInfoTo = "/api.user.v1.User/UpdateUserInfoTo"
 
@@ -48,6 +49,7 @@ type UserHTTPServer interface {
 	RewardCardTwo(context.Context, *RewardCardTwoRequest) (*RewardCardTwoReply, error)
 	SetUserCount(context.Context, *SetUserCountRequest) (*SetUserCountReply, error)
 	SetVipThree(context.Context, *SetVipThreeRequest) (*SetVipThreeReply, error)
+	UpdateAllCard(context.Context, *UpdateAllCardRequest) (*UpdateAllCardReply, error)
 	UpdateCanVip(context.Context, *UpdateCanVipRequest) (*UpdateCanVipReply, error)
 	UpdateUserInfoTo(context.Context, *UpdateUserInfoToRequest) (*UpdateUserInfoToReply, error)
 }
@@ -68,6 +70,7 @@ func RegisterUserHTTPServer(s *http.Server, srv UserHTTPServer) {
 	r.POST("/api/admin_dhb/set_user_count", _User_SetUserCount0_HTTP_Handler(srv))
 	r.GET("/api/admin_dhb/config", _User_AdminConfig0_HTTP_Handler(srv))
 	r.POST("/api/admin_dhb/config_update", _User_AdminConfigUpdate0_HTTP_Handler(srv))
+	r.GET("/api/admin_dhb/update_all_card", _User_UpdateAllCard0_HTTP_Handler(srv))
 }
 
 func _User_OpenCardHandle0_HTTP_Handler(srv UserHTTPServer) func(ctx http.Context) error {
@@ -354,6 +357,25 @@ func _User_AdminConfigUpdate0_HTTP_Handler(srv UserHTTPServer) func(ctx http.Con
 	}
 }
 
+func _User_UpdateAllCard0_HTTP_Handler(srv UserHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in UpdateAllCardRequest
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationUserUpdateAllCard)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.UpdateAllCard(ctx, req.(*UpdateAllCardRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*UpdateAllCardReply)
+		return ctx.Result(200, reply)
+	}
+}
+
 type UserHTTPClient interface {
 	AdminConfig(ctx context.Context, req *AdminConfigRequest, opts ...http.CallOption) (rsp *AdminConfigReply, err error)
 	AdminConfigUpdate(ctx context.Context, req *AdminConfigUpdateRequest, opts ...http.CallOption) (rsp *AdminConfigUpdateReply, err error)
@@ -367,6 +389,7 @@ type UserHTTPClient interface {
 	RewardCardTwo(ctx context.Context, req *RewardCardTwoRequest, opts ...http.CallOption) (rsp *RewardCardTwoReply, err error)
 	SetUserCount(ctx context.Context, req *SetUserCountRequest, opts ...http.CallOption) (rsp *SetUserCountReply, err error)
 	SetVipThree(ctx context.Context, req *SetVipThreeRequest, opts ...http.CallOption) (rsp *SetVipThreeReply, err error)
+	UpdateAllCard(ctx context.Context, req *UpdateAllCardRequest, opts ...http.CallOption) (rsp *UpdateAllCardReply, err error)
 	UpdateCanVip(ctx context.Context, req *UpdateCanVipRequest, opts ...http.CallOption) (rsp *UpdateCanVipReply, err error)
 	UpdateUserInfoTo(ctx context.Context, req *UpdateUserInfoToRequest, opts ...http.CallOption) (rsp *UpdateUserInfoToReply, err error)
 }
@@ -529,6 +552,19 @@ func (c *UserHTTPClientImpl) SetVipThree(ctx context.Context, in *SetVipThreeReq
 	opts = append(opts, http.Operation(OperationUserSetVipThree))
 	opts = append(opts, http.PathTemplate(pattern))
 	err := c.cc.Invoke(ctx, "POST", path, in.SendBody, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, err
+}
+
+func (c *UserHTTPClientImpl) UpdateAllCard(ctx context.Context, in *UpdateAllCardRequest, opts ...http.CallOption) (*UpdateAllCardReply, error) {
+	var out UpdateAllCardReply
+	pattern := "/api/admin_dhb/update_all_card"
+	path := binding.EncodeURL(pattern, in, true)
+	opts = append(opts, http.Operation(OperationUserUpdateAllCard))
+	opts = append(opts, http.PathTemplate(pattern))
+	err := c.cc.Invoke(ctx, "GET", path, nil, &out, opts...)
 	if err != nil {
 		return nil, err
 	}

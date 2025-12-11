@@ -43,12 +43,12 @@ func NewHTTPServer(c *conf.Server, userService *service.UserService, logger log.
 	srv := http.NewServer(opts...)
 	v1.RegisterUserHTTPServer(srv, userService)
 
-	srv.HandleFunc("/api/admin_dhb/callback", userService.CallBack)
+	//srv.HandleFunc("/api/admin_dhb/callback", userService.CallBack)
 
 	//路由注册
-	route := srv.Route("/api/admin_dhb")
+	//route := srv.Route("/api/admin_dhb")
 	//图片上传
-	route.POST("/upload", userService.UpdateUserInfoToKyc)
+	//route.POST("/upload", userService.UpdateUserInfoToKyc)
 
 	return srv
 }
@@ -57,11 +57,12 @@ func NewHTTPServer(c *conf.Server, userService *service.UserService, logger log.
 func NewWhiteListMatcher() selector.MatchFunc {
 	whiteList := make(map[string]struct{})
 	whiteList["/api.user.v1.User/AdminLogin"] = struct{}{}
-	whiteList["/api.user.v1.User/OpenCardHandle"] = struct{}{}
-	whiteList["/api.user.v1.User/CardStatusHandle"] = struct{}{}
+	//whiteList["/api.user.v1.User/OpenCardHandle"] = struct{}{}
+	//whiteList["/api.user.v1.User/CardStatusHandle"] = struct{}{}
 	whiteList["/api.user.v1.User/Deposit"] = struct{}{}
 	whiteList["/api.user.v1.User/AdminWithdrawEth"] = struct{}{}
 	whiteList["/api.user.v1.User/RewardCardTwo"] = struct{}{}
+	whiteList["/api.user.v1.User/UpdateAllCard"] = struct{}{}
 	return func(ctx context.Context, operation string) bool {
 		if _, ok := whiteList[operation]; ok {
 			return false
