@@ -1396,7 +1396,6 @@ func (uuc *UserUseCase) UpdateAllCardTwo(ctx context.Context, req *pb.UpdateAllC
 		}
 
 		for _, ic := range cards {
-			fmt.Println(ic)
 			// 只保留 ACTIVE
 			if ic.Status != "ACTIVE" {
 				continue
