@@ -153,6 +153,7 @@ type UserRepo interface {
 	GetUserRecommendLikeCode(code string) ([]*UserRecommend, error)
 	GetUserByUserIds(userIds ...uint64) (map[uint64]*User, error)
 	CreateCard(ctx context.Context, userId uint64, user *User) error
+	HasCardByCardID(ctx context.Context, cardID string) (bool, error)
 	GetAllUsers() ([]*User, error)
 	UpdateCard(ctx context.Context, userId uint64, cardOrderId, card string) error
 	UpdateCardNo(ctx context.Context, userId uint64, amount float64) error
@@ -1249,6 +1250,125 @@ func (uuc *UserUseCase) UpdateUserInfoTo(ctx transporthttp.Context) error {
 }
 
 func (uuc *UserUseCase) UpdateAllCard(ctx context.Context, req *pb.UpdateAllCardRequest) (*pb.UpdateAllCardReply, error) {
+	const (
+		pageSize = 100
+	)
+
+	// 1. 先拿第一页，顺便拿到 total
+	firstCards, totalStr, err := InterlaceListCards(ctx, &InterlaceListCardsReq{
+		AccountId: interlaceAccountId,
+		Page:      1,
+		Limit:     pageSize,
+	})
+	if err != nil {
+		fmt.Println("InterlaceListCards page 1 error:", err)
+		return nil, err
+	}
+
+	if totalStr == "" {
+		fmt.Println("no cards, total = 0")
+		return &pb.UpdateAllCardReply{}, nil
+	}
+
+	total, err := strconv.ParseInt(totalStr, 10, 64)
+	if err != nil {
+		fmt.Println("InterlaceListCards parse total error:", err)
+		return nil, err
+	}
+
+	if total <= 0 {
+		fmt.Println("no cards, total <= 0")
+		return &pb.UpdateAllCardReply{}, nil
+	}
+
+	// 计算总页数： (total + pageSize - 1) / pageSize
+	pageCount := int((total + int64(pageSize) - 1) / int64(pageSize))
+	if pageCount <= 0 {
+		pageCount = 1
+	}
+
+	fmt.Printf("start sync cards, total=%d, pageCount=%d\n", total, pageCount)
+
+	// 把第一页也放到统一处理逻辑里
+	for page := 1; page <= pageCount; page++ {
+		var cards []*InterlaceCard
+		if page == 1 {
+			cards = firstCards
+		} else {
+			// 每次请求间隔 100ms
+			time.Sleep(100 * time.Millisecond)
+
+			cs, _, errTwo := InterlaceListCards(ctx, &InterlaceListCardsReq{
+				AccountId: interlaceAccountId,
+				Page:      page,
+				Limit:     pageSize,
+			})
+			if errTwo != nil {
+				fmt.Println("InterlaceListCards page", page, "error:", errTwo)
+				// 拉失败这一页就跳过，继续后面的
+				continue
+			}
+			cards = cs
+		}
+
+		if len(cards) == 0 {
+			continue
+		}
+
+		for _, ic := range cards {
+			// 只保留 ACTIVE
+			if ic.Status != "ACTIVE" {
+				continue
+			}
+
+			// 数据库中没有这条 card 则插入
+			exists, errHas := uuc.repo.HasCardByCardID(ctx, ic.ID)
+			if errHas != nil {
+				fmt.Println("HasCardByCardID error, cardID =", ic.ID, "err =", errHas)
+				continue
+			}
+			if exists {
+				continue
+			}
+
+			var tmpCreateTime int64
+			tmpCreateTime, err = strconv.ParseInt(ic.CreateTime, 10, 64)
+			if 0 >= tmpCreateTime || nil != err {
+				fmt.Println("InterlaceListCards create time", ic, "error:", err)
+				// 出错就整体结束本次同步，避免老数据乱插
+				break
+			}
+
+			// 组装 biz.Card 对象
+			card := &Card{
+				CardID:              ic.ID,
+				AccountID:           ic.AccountID,
+				CardholderID:        ic.CardholderID,
+				BalanceID:           ic.BalanceID,
+				BudgetID:            ic.BudgetID,
+				ReferenceID:         ic.ReferenceID,
+				UserName:            ic.UserName,
+				Currency:            ic.Currency,
+				Bin:                 ic.Bin,
+				Status:              ic.Status,
+				CardMode:            ic.CardMode,
+				Label:               ic.Label,
+				CardLastFour:        ic.CardLastFour,
+				InterlaceCreateTime: tmpCreateTime, // 毫秒时间戳
+			}
+
+			if errTwo := uuc.repo.CreateCardNew(ctx, card); errTwo != nil {
+				fmt.Println("CreateCard error, cardID =", ic.ID, "err =", err)
+				// 这条失败就算了，不影响其它
+				continue
+			}
+		}
+	}
+
+	return &pb.UpdateAllCardReply{}, nil
+}
+
+func (uuc *UserUseCase) UpdateAllCardBak(ctx context.Context, req *pb.UpdateAllCardRequest) (*pb.UpdateAllCardReply, error) {
 	const (
 		pageSize = 100
 		maxPages = 200

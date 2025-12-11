@@ -512,6 +512,29 @@ func (u *UserRepo) GetConfigByKeys(keys ...string) ([]*biz.Config, error) {
 	return res, nil
 }
 
+// HasCardByCardID 判断数据库中是否已经存在该 card_id
+func (u *UserRepo) HasCardByCardID(ctx context.Context, cardID string) (bool, error) {
+	if cardID == "" {
+		return false, nil
+	}
+
+	var c Card
+	err := u.data.DB(ctx).
+		Table("card").
+		Select("id").
+		Where("card_id = ?", cardID).
+		Take(&c).Error
+
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, nil
+		}
+		return false, errors.New(500, "CARD_ERROR", err.Error())
+	}
+
+	return true, nil
+}
+
 // CreateCard .
 func (u *UserRepo) CreateCard(ctx context.Context, userId uint64, user *biz.User) error {
 	res := u.data.DB(ctx).Table("user").Where("id=?", userId).Where("amount>=?", user.Amount).Where("card_order_id=?", "no").
