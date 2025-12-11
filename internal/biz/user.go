@@ -2963,7 +2963,7 @@ func InterlaceCardTransferOut(ctx context.Context, in *InterlaceCardTransferOutR
 		return nil, err
 	}
 
-	fmt.Println("transfer-out resp:", string(respBody))
+	//fmt.Println("transfer-out resp:", string(respBody))
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, fmt.Errorf("interlace transfer out http %d: %s", resp.StatusCode, string(respBody))
