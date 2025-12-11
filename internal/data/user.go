@@ -66,6 +66,8 @@ type CardTwo struct {
 	CardAmount       float64   `gorm:"type:decimal(65,20);not null"`
 	CreatedAt        time.Time `gorm:"type:datetime;not null"`
 	UpdatedAt        time.Time `gorm:"type:datetime;not null"`
+	IdCard           string    `gorm:"type:varchar(45);not null;default:'no'"`
+	Gender           string    `gorm:"type:varchar(45);not null;default:'no'"`
 }
 
 type Admin struct {
@@ -479,6 +481,40 @@ func (u *UserRepo) UpdateWithdraw(ctx context.Context, id uint64, status string)
 
 // GetUserByUserIds .
 func (u *UserRepo) GetUserByUserIds(userIds ...uint64) (map[uint64]*biz.User, error) {
+	var users []*User
+
+	res := make(map[uint64]*biz.User, 0)
+	if err := u.data.db.Table("user").Where("id IN (?)", userIds).Find(&users).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return res, errors.NotFound("USER_NOT_FOUND", "user not found")
+		}
+
+		return nil, errors.New(500, "USER ERROR", err.Error())
+	}
+
+	for _, user := range users {
+		res[user.ID] = &biz.User{
+			CardAmount:    user.CardAmount,
+			MyTotalAmount: user.MyTotalAmount,
+			AmountTwo:     user.AmountTwo,
+			IsDelete:      user.IsDelete,
+			Vip:           user.Vip,
+			ID:            user.ID,
+			Address:       user.Address,
+			Card:          user.Card,
+			Amount:        user.Amount,
+			CreatedAt:     user.CreatedAt,
+			UpdatedAt:     user.UpdatedAt,
+			CardNumber:    user.CardNumber,
+			CardOrderId:   user.CardOrderId,
+		}
+	}
+
+	return res, nil
+}
+
+// GetUserByUserIdsTwo .
+func (u *UserRepo) GetUserByUserIdsTwo(userIds []uint64) (map[uint64]*biz.User, error) {
 	var users []*User
 
 	res := make(map[uint64]*biz.User, 0)
@@ -1171,7 +1207,7 @@ func (u *UserRepo) GetUserCardTwo() ([]*biz.Reward, error) {
 }
 
 // GetUsers .
-func (u *UserRepo) GetUsers(b *biz.Pagination, address string) ([]*biz.User, error, int64) {
+func (u *UserRepo) GetUsers(b *biz.Pagination, address string, cardTwo uint64, cardOrderId string) ([]*biz.User, error, int64) {
 	var (
 		users []*User
 		count int64
@@ -1179,6 +1215,14 @@ func (u *UserRepo) GetUsers(b *biz.Pagination, address string) ([]*biz.User, err
 	instance := u.data.db.Table("user")
 	if "" != address {
 		instance = instance.Where("address=?", address)
+	}
+
+	if "" != cardOrderId {
+		instance = instance.Where("card_order_id=?", cardOrderId)
+	}
+
+	if 0 < cardTwo {
+		instance = instance.Where("card_two=?", cardTwo)
 	}
 
 	instance = instance.Count(&count)
@@ -1484,6 +1528,38 @@ func (u *UserRepo) CreateCardNew(ctx context.Context, userId, id uint64, in *biz
 	return nil
 }
 
+// UpdateUserDoing 创建一条卡片记录
+func (u *UserRepo) UpdateUserDoing(ctx context.Context, userId uint64, cardNumber string, cardAmount float64) error {
+	resTwo := u.data.DB(ctx).Table("user").Where("id=?", userId).
+		Updates(map[string]interface{}{
+			"card_order_id": "doing",
+			"card_number":   cardNumber,
+			"card_amount":   cardAmount,
+			"updated_at":    time.Now().Format("2006-01-02 15:04:05"),
+		})
+	if resTwo.Error != nil || 0 >= resTwo.RowsAffected {
+		return errors.New(500, "CreateCardOne", "用户信息修改失败")
+	}
+
+	return nil
+}
+
+// UpdateCardStatus 创建一条卡片记录
+func (u *UserRepo) UpdateCardStatus(ctx context.Context, id uint64, cardNumber string, cardAmount float64) error {
+	res := u.data.DB(ctx).Table("card_two").Where("id=?", id).
+		Updates(map[string]interface{}{
+			"card_amount": cardAmount,
+			"card_id":     cardNumber,
+			"status":      1,
+			"updated_at":  time.Now().Format("2006-01-02 15:04:05"),
+		})
+	if res.Error != nil || 0 >= res.RowsAffected {
+		return errors.New(500, "UpdateCardStatus", "用户信息修改失败")
+	}
+
+	return nil
+}
+
 // CreateCardOne 创建一条卡片记录
 func (u *UserRepo) CreateCardOne(ctx context.Context, userId uint64, in *biz.Card) error {
 	resTwo := u.data.DB(ctx).Table("user").Where("id=?", userId).
@@ -1616,4 +1692,73 @@ func (u *UserRepo) GetUsersStatusDoing() ([]*biz.User, error) {
 		})
 	}
 	return res, nil
+}
+
+// GetCardTwos .
+// 分页查询实体卡用户信息（card_two 表）
+func (u *UserRepo) GetCardTwos(b *biz.Pagination, userId uint64, status uint64, cardId string) ([]*biz.CardTwo, error, int64) {
+	var (
+		cardTwos []*CardTwo
+		count    int64
+	)
+
+	// 基础查询
+	instance := u.data.db.Table("card_two")
+
+	if userId > 0 {
+		instance = instance.Where("user_id = ?", userId)
+	}
+
+	if status > 0 {
+		instance = instance.Where("status = ?", status)
+	}
+
+	if cardId != "" {
+		instance = instance.Where("card_id = ?", cardId)
+	}
+
+	// 统计总数
+	instance = instance.Count(&count)
+
+	// 分页 + 排序
+	if err := instance.Scopes(Paginate(b.PageNum, b.PageSize)).
+		Order("id desc").
+		Find(&cardTwos).Error; err != nil {
+
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.NotFound("CARD_TWO_NOT_FOUND", "card_two not found"), 0
+		}
+
+		return nil, errors.New(500, "CARD_TWO_ERROR", err.Error()), 0
+	}
+
+	// 转成 biz 层对象
+	res := make([]*biz.CardTwo, 0, len(cardTwos))
+	for _, c := range cardTwos {
+		res = append(res, &biz.CardTwo{
+			ID:               c.ID,
+			UserId:           c.UserId,
+			FirstName:        c.FirstName,
+			LastName:         c.LastName,
+			Email:            c.Email,
+			CountryCode:      c.CountryCode,
+			Phone:            c.Phone,
+			City:             c.City,
+			Country:          c.Country,
+			Street:           c.Street,
+			PostalCode:       c.PostalCode,
+			BirthDate:        c.BirthDate,
+			PhoneCountryCode: c.PhoneCountryCode,
+			State:            c.State,
+			Status:           c.Status,
+			CardId:           c.CardId,
+			CardAmount:       c.CardAmount,
+			CreatedAt:        c.CreatedAt,
+			UpdatedAt:        c.UpdatedAt,
+			IdCard:           c.IdCard,
+			Gender:           c.Gender,
+		})
+	}
+
+	return res, nil, count
 }

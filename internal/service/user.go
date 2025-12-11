@@ -320,6 +320,18 @@ func (u *UserService) AdminUserList(ctx context.Context, req *pb.AdminUserListRe
 	return u.uuc.AdminUserList(ctx, req)
 }
 
+func (u *UserService) AdminCardTwoList(ctx context.Context, req *pb.AdminCardTwoRequest) (*pb.AdminCardTwoReply, error) {
+	return u.uuc.AdminCardTwoList(ctx, req)
+}
+
+func (u *UserService) AdminUserBind(ctx context.Context, req *pb.AdminUserBindRequest) (*pb.AdminUserBindReply, error) {
+	return u.uuc.AdminUserBind(ctx, req)
+}
+
+func (u *UserService) AdminUserBindTwo(ctx context.Context, req *pb.AdminUserBindTwoRequest) (*pb.AdminUserBindTwoReply, error) {
+	return u.uuc.AdminUserBindTwo(ctx, req)
+}
+
 func (u *UserService) UpdateUserInfoTo(ctx context.Context, req *pb.UpdateUserInfoToRequest) (*pb.UpdateUserInfoToReply, error) {
 	return nil, nil
 }

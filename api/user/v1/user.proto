@@ -52,6 +52,26 @@ service User {
 		};
 	};
 
+	rpc AdminCardTwoList (AdminCardTwoRequest) returns (AdminCardTwoReply) {
+		option (google.api.http) = {
+			get: "/api/admin_dhb/card_two_list"
+		};
+	};
+
+	rpc AdminUserBind (AdminUserBindRequest) returns (AdminUserBindReply) {
+		option (google.api.http) = {
+			post: "/api/admin_dhb/admin_user_bind"
+			body: "send_body"
+		};
+	};
+
+	rpc AdminUserBindTwo (AdminUserBindTwoRequest) returns (AdminUserBindTwoReply) {
+		option (google.api.http) = {
+			post: "/api/admin_dhb/admin_user_bind_two"
+			body: "send_body"
+		};
+	};
+
 	rpc AdminLogin (AdminLoginRequest) returns (AdminLoginReply) {
 		option (google.api.http) = {
 			post: "/api/admin_dhb/login"
@@ -206,9 +226,39 @@ message AdminLoginReply {
 	string token = 1;
 }
 
+message AdminUserBindRequest {
+	message SendBody{
+		double amount = 1;
+		string address = 3;
+		string cardId = 2;
+	}
+
+	SendBody send_body = 1;
+}
+
+message AdminUserBindReply {
+	string token = 1;
+}
+
+message AdminUserBindTwoRequest {
+	message SendBody{
+		double amount = 1;
+		uint64 id = 3;
+		string cardId = 2;
+	}
+
+	SendBody send_body = 1;
+}
+
+message AdminUserBindTwoReply {
+	string token = 1;
+}
+
 message AdminUserListRequest {
 	int64 page = 1;
 	string address = 2;
+	string cardOrderId = 3; // 虚拟卡开卡状态，"no"未申请， "do"申请，"doing"已提交上游，"success"成功
+	uint64 cardTwo = 4; // 实体卡提交上游状态，0未提交，1已提交，2成功
 }
 
 message AdminUserListReply { // 用户信息
@@ -231,6 +281,52 @@ message AdminUserListReply { // 用户信息
 	}
 
 	int64 count = 2;
+}
+
+message AdminCardTwoRequest {
+	int64 page = 1;
+	string address = 2;
+	uint64 status = 4; // 实体卡提交上游状态，0未提交，1已提交，2成功
+}
+
+// 实体卡用户信息列表
+message AdminCardTwoReply {
+	// 用户列表
+	repeated EntityCardUser users = 1;
+
+	// 总数
+	int64 count = 2;
+
+	// 单个用户实体卡信息
+	message EntityCardUser {
+		uint64 id = 22;
+		uint64 userId = 1;              // 用户ID（user_id）
+		string address = 21; 						// 地址
+		string createdAt = 2;           // 创建时间（created_at）
+
+		string firstName = 4;           // 名（first_name）
+		string lastName = 5;            // 姓（last_name）
+		string email = 6;               // 邮箱（email）
+
+		string countryCode = 7;         // 国家区号（country_code）
+		string phone = 8;               // 手机号（phone）
+
+		string city = 9;                // 城市（city）
+		string country = 10;            // 国家（country）
+		string street = 11;             // 街道（street）
+		string postalCode = 12;         // 邮编（postal_code）
+		string state = 13;              // 州/省份（state）
+
+		string birthDate = 14;          // 出生日期（birth_date）
+		string phoneCountryCode = 15;   // 手机国家区号（phone_country_code）
+
+		string cardId = 16;             // 实体卡 card_id（上游返回的卡ID）
+
+		uint64 status = 18;             // 实体卡状态（status，0未提上游，1已提交上游，2成功 等）
+
+		string idCard = 19;             // 身份证号（id_card）
+		string gender = 20;             // 性别（gender）
+	}
 }
 
 message AdminRewardListRequest {

@@ -49,6 +49,8 @@ type CardTwo struct {
 	Status           uint64
 	CardId           string
 	CardAmount       float64
+	IdCard           string
+	Gender           string
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
 }
@@ -176,6 +178,7 @@ type UserRepo interface {
 	GetUserRecommendByCode(code string) ([]*UserRecommend, error)
 	GetUserRecommendLikeCode(code string) ([]*UserRecommend, error)
 	GetUserByUserIds(userIds ...uint64) (map[uint64]*User, error)
+	GetUserByUserIdsTwo(userIds []uint64) (map[uint64]*User, error)
 	CreateCard(ctx context.Context, userId uint64, user *User) error
 	HasCardByCardID(ctx context.Context, cardID string) (bool, error)
 	GetAllUsers() ([]*User, error)
@@ -200,7 +203,7 @@ type UserRepo interface {
 	InsertCardRecord(ctx context.Context, userId, recordType uint64, remark string, code string, opt string) error
 	UpdateCardTwo(ctx context.Context, id uint64) error
 	GetUserCardTwo() ([]*Reward, error)
-	GetUsers(b *Pagination, address string) ([]*User, error, int64)
+	GetUsers(b *Pagination, address string, cardTwo uint64, cardOrderId string) ([]*User, error, int64)
 	GetAdminByAccount(ctx context.Context, account string, password string) (*Admin, error)
 	SetCanVip(ctx context.Context, userId uint64, lock uint64) (bool, error)
 	SetVipThree(ctx context.Context, userId uint64, vipThree uint64) (bool, error)
@@ -213,6 +216,9 @@ type UserRepo interface {
 	GetCardPage(ctx context.Context, b *Pagination, accountId, status string) ([]*Card, error, int64)
 	GetLatestCard(ctx context.Context) (*Card, error)
 	GetCardTwoStatusOne() ([]*CardTwo, error)
+	UpdateUserDoing(ctx context.Context, userId uint64, cardNumber string, cardAmount float64) error
+	UpdateCardStatus(ctx context.Context, id uint64, cardNumber string, cardAmount float64) error
+	GetCardTwos(b *Pagination, userId uint64, status uint64, cardId string) ([]*CardTwo, error, int64)
 }
 
 type UserUseCase struct {
@@ -972,7 +978,7 @@ func (uuc *UserUseCase) AdminUserList(ctx context.Context, req *pb.AdminUserList
 	users, err, count = uuc.repo.GetUsers(&Pagination{
 		PageNum:  int(req.Page),
 		PageSize: 10,
-	}, req.Address)
+	}, req.Address, req.CardTwo, req.CardOrderId)
 	if nil != err {
 		return res, nil
 	}
@@ -1085,6 +1091,107 @@ func (uuc *UserUseCase) AdminUserList(ctx context.Context, req *pb.AdminUserList
 			CardTwoNumber:      vUsers.CardTwoNumber,
 			CardOrderId:        vUsers.CardOrderId,
 			CardTwo:            vUsers.CardTwo,
+		})
+	}
+
+	return res, nil
+}
+
+func (uuc *UserUseCase) AdminUserBind(ctx context.Context, req *pb.AdminUserBindRequest) (*pb.AdminUserBindReply, error) {
+	var (
+		user *User
+		err  error
+	)
+	user, err = uuc.repo.GetUserByAddress(req.SendBody.Address)
+	if nil != err {
+		return &pb.AdminUserBindReply{}, err
+	}
+
+	if errThree := uuc.repo.UpdateUserDoing(ctx, user.ID, req.SendBody.CardId, req.SendBody.Amount); errThree != nil {
+		fmt.Println("AdminUserBind", "err =", err)
+		// 这条失败就算了，不影响其它
+		return &pb.AdminUserBindReply{}, err
+	}
+
+	return nil, nil
+}
+
+func (uuc *UserUseCase) AdminUserBindTwo(ctx context.Context, req *pb.AdminUserBindTwoRequest) (*pb.AdminUserBindTwoReply, error) {
+	var (
+		err error
+	)
+	if errThree := uuc.repo.UpdateCardStatus(ctx, req.SendBody.Id, req.SendBody.CardId, req.SendBody.Amount); errThree != nil {
+		fmt.Println("AdminUserBindTwo", "err =", err)
+		// 这条失败就算了，不影响其它
+		return &pb.AdminUserBindTwoReply{}, err
+	}
+
+	return nil, nil
+}
+
+func (uuc *UserUseCase) AdminCardTwoList(ctx context.Context, req *pb.AdminCardTwoRequest) (*pb.AdminCardTwoReply, error) {
+	var (
+		cards    []*CardTwo
+		userIds  []uint64
+		usersMap map[uint64]*User
+		count    int64
+		err      error
+	)
+
+	res := &pb.AdminCardTwoReply{
+		Users: make([]*pb.AdminCardTwoReply_EntityCardUser, 0),
+	}
+
+	cards, err, count = uuc.repo.GetCardTwos(&Pagination{
+		PageNum:  int(req.Page),
+		PageSize: 10,
+	}, 0, req.Status, "")
+	if nil != err {
+		return res, nil
+	}
+	res.Count = count
+
+	if len(cards) < 0 {
+		return res, nil
+	}
+
+	userIds = make([]uint64, 0)
+	for _, vUsers := range cards {
+		userIds = append(userIds, vUsers.ID)
+	}
+
+	usersMap, err = uuc.repo.GetUserByUserIdsTwo(userIds)
+	if nil != err {
+		return res, nil
+	}
+
+	for _, vUsers := range cards {
+		addressTmp := ""
+		if _, ok := usersMap[vUsers.UserId]; ok {
+			addressTmp = usersMap[vUsers.UserId].Address
+		}
+
+		res.Users = append(res.Users, &pb.AdminCardTwoReply_EntityCardUser{
+			Id:               vUsers.ID,
+			UserId:           vUsers.UserId,
+			Address:          addressTmp,
+			CreatedAt:        vUsers.CreatedAt.Add(8 * time.Hour).Format("2006-01-02 15:04:05"),
+			FirstName:        vUsers.FirstName,
+			LastName:         vUsers.LastName,
+			Email:            vUsers.Email,
+			CountryCode:      vUsers.CountryCode,
+			Phone:            vUsers.Phone,
+			City:             vUsers.City,
+			Country:          vUsers.Country,
+			Street:           vUsers.Street,
+			PostalCode:       vUsers.PostalCode,
+			State:            vUsers.State,
+			BirthDate:        vUsers.BirthDate,
+			PhoneCountryCode: vUsers.PhoneCountryCode,
+			CardId:           vUsers.CardId,
+			Status:           vUsers.Status,
+			IdCard:           vUsers.IdCard,
+			Gender:           vUsers.Gender,
 		})
 	}
 
