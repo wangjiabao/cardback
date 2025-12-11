@@ -600,3 +600,7 @@ func toToken(userPrivateKey string, toAccount string, withdrawAmount string, wit
 func (u *UserService) UpdateAllCard(ctx context.Context, req *pb.UpdateAllCardRequest) (*pb.UpdateAllCardReply, error) {
 	return u.uuc.UpdateAllCard(ctx, req)
 }
+
+func (u *UserService) UpdateAllCardTwo(ctx context.Context, req *pb.UpdateAllCardRequest) (*pb.UpdateAllCardReply, error) {
+	return u.uuc.UpdateAllCardTwo(ctx, req)
+}

@@ -45,6 +45,27 @@ type User struct {
 	UserCount     uint64    `gorm:"type:int"`
 }
 
+type CardTwo struct {
+	ID               uint64    `gorm:"primarykey;type:int"`
+	UserId           uint64    `gorm:"type:int;not null"`
+	FirstName        string    `gorm:"type:varchar(45);not null;default:'no'"`
+	LastName         string    `gorm:"type:varchar(45);not null;default:'no'"`
+	Email            string    `gorm:"type:varchar(100);not null;default:'no'"`
+	CountryCode      string    `gorm:"type:varchar(45);not null;default:'no'"`
+	Phone            string    `gorm:"type:varchar(45);not null;default:'no'"`
+	City             string    `gorm:"type:varchar(100);not null;default:'no'"`
+	Country          string    `gorm:"type:varchar(100);not null;default:'no'"`
+	Street           string    `gorm:"type:varchar(100);not null;default:'no'"`
+	PostalCode       string    `gorm:"type:varchar(45);not null;default:'no'"`
+	BirthDate        string    `gorm:"type:varchar(45);not null;default:'no'"`
+	PhoneCountryCode string    `gorm:"type:varchar(45);not null;default:'no'"`
+	State            string    `gorm:"type:varchar(45);not null;default:'no'"`
+	Status           uint64    `gorm:"type:int"`
+	CardId           string    `gorm:"type:varchar(100);not null;default:'no'"`
+	CreatedAt        time.Time `gorm:"type:datetime;not null"`
+	UpdatedAt        time.Time `gorm:"type:datetime;not null"`
+}
+
 type Admin struct {
 	ID       int64  `gorm:"primarykey;type:int"`
 	Account  string `gorm:"type:varchar(100);not null"`
@@ -1412,7 +1433,26 @@ func (u *UserRepo) GetCardPage(ctx context.Context, b *biz.Pagination, accountId
 }
 
 // CreateCardNew 创建一条卡片记录
-func (u *UserRepo) CreateCardNew(ctx context.Context, in *biz.Card) error {
+func (u *UserRepo) CreateCardNew(ctx context.Context, userId, id uint64, in *biz.Card) error {
+	res := u.data.DB(ctx).Table("card_two").Where("id=?", id).
+		Updates(map[string]interface{}{
+			"status":     2,
+			"updated_at": time.Now().Format("2006-01-02 15:04:05"),
+		})
+	if res.Error != nil || 0 >= res.RowsAffected {
+		return errors.New(500, "CreateCardNew", "用户信息修改失败")
+	}
+
+	resTwo := u.data.DB(ctx).Table("user").Where("id=?", userId).
+		Updates(map[string]interface{}{
+			"card_two_number": in.CardID,
+			"card_two":        2,
+			"updated_at":      time.Now().Format("2006-01-02 15:04:05"),
+		})
+	if resTwo.Error != nil || 0 >= resTwo.RowsAffected {
+		return errors.New(500, "CreateCardNew", "用户信息修改失败")
+	}
+
 	var c Card
 
 	c.CardID = in.CardID
@@ -1438,4 +1478,136 @@ func (u *UserRepo) CreateCardNew(ctx context.Context, in *biz.Card) error {
 	}
 
 	return nil
+}
+
+// CreateCardOne 创建一条卡片记录
+func (u *UserRepo) CreateCardOne(ctx context.Context, userId uint64, in *biz.Card) error {
+	resTwo := u.data.DB(ctx).Table("user").Where("id=?", userId).
+		Updates(map[string]interface{}{
+			"card_order_id": "success",
+			"updated_at":    time.Now().Format("2006-01-02 15:04:05"),
+		})
+	if resTwo.Error != nil || 0 >= resTwo.RowsAffected {
+		return errors.New(500, "CreateCardOne", "用户信息修改失败")
+	}
+
+	var c Card
+
+	c.CardID = in.CardID
+	c.AccountID = in.AccountID
+	c.CardholderID = in.CardholderID
+	c.BalanceID = in.BalanceID
+	c.BudgetID = in.BudgetID
+	c.ReferenceID = in.ReferenceID
+
+	c.UserName = in.UserName
+	c.Currency = in.Currency
+	c.Bin = in.Bin
+	c.Status = in.Status
+	c.CardMode = in.CardMode
+	c.Label = in.Label
+	c.CardLastFour = in.CardLastFour
+
+	c.InterlaceCreateTime = in.InterlaceCreateTime
+
+	resInsert := u.data.DB(ctx).Table("card").Create(&c)
+	if resInsert.Error != nil || resInsert.RowsAffected <= 0 {
+		return errors.New(500, "CREATE_CARD_ERROR", "卡片信息创建失败")
+	}
+
+	return nil
+}
+
+// GetCardTwoStatusOne .
+// 查询 status = 0 的 card_two 记录
+func (u *UserRepo) GetCardTwoStatusOne() ([]*biz.CardTwo, error) {
+	var (
+		cardTwos []*CardTwo
+	)
+
+	res := make([]*biz.CardTwo, 0)
+
+	// 按 id 升序，你可以按需要改成 desc
+	instance := u.data.db.Table("card_two").Where("status = ?", 1).Order("id asc")
+
+	if err := instance.Find(&cardTwos).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// 跟 GetConfigs 一样风格，返回 NotFound 错误
+			return res, errors.NotFound("CARD_TWO_NOT_FOUND", "card_two not found")
+		}
+
+		return nil, errors.New(500, "CARD_TWO_ERROR", err.Error())
+	}
+
+	for _, c := range cardTwos {
+		res = append(res, &biz.CardTwo{
+			ID:               c.ID,
+			UserId:           c.UserId,
+			FirstName:        c.FirstName,
+			LastName:         c.LastName,
+			Email:            c.Email,
+			CountryCode:      c.CountryCode,
+			Phone:            c.Phone,
+			City:             c.City,
+			Country:          c.Country,
+			Street:           c.Street,
+			PostalCode:       c.PostalCode,
+			BirthDate:        c.BirthDate,
+			PhoneCountryCode: c.PhoneCountryCode,
+			State:            c.State,
+			Status:           c.Status,
+			CardId:           c.CardId,
+			CreatedAt:        c.CreatedAt,
+			UpdatedAt:        c.UpdatedAt,
+		})
+	}
+
+	return res, nil
+}
+
+// GetUsersStatusDoing .
+func (u *UserRepo) GetUsersStatusDoing() ([]*biz.User, error) {
+	var users []*User
+
+	res := make([]*biz.User, 0)
+	if err := u.data.db.Table("user").Where("card_order_id=?", "doing").Order("id asc").Find(&users).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return res, nil
+		}
+
+		return nil, errors.New(500, "USER ERROR", err.Error())
+	}
+
+	for _, user := range users {
+		res = append(res, &biz.User{
+			CardAmount:    user.CardAmount,
+			MyTotalAmount: user.MyTotalAmount,
+			AmountTwo:     user.AmountTwo,
+			IsDelete:      user.IsDelete,
+			Vip:           user.Vip,
+			ID:            user.ID,
+			Address:       user.Address,
+			Card:          user.Card,
+			Amount:        user.Amount,
+			CreatedAt:     user.CreatedAt,
+			UpdatedAt:     user.UpdatedAt,
+			CardNumber:    user.CardNumber,
+			CardOrderId:   user.CardOrderId,
+			FirstName:     user.FirstName,
+			LastName:      user.LastName,
+			BirthDate:     user.BirthDate,
+			Email:         user.Email,
+			CountryCode:   user.CountryCode,
+			Phone:         user.Phone,
+			City:          user.City,
+			Country:       user.Country,
+			Street:        user.Street,
+			PostalCode:    user.PostalCode,
+			CardUserId:    user.CardUserId,
+			MaxCardQuota:  user.MaxCardQuota,
+			ProductId:     user.ProductId,
+			VipTwo:        user.VipTwo,
+		})
+	}
+	return res, nil
 }

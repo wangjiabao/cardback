@@ -31,6 +31,27 @@ type Admin struct {
 	Type     string
 }
 
+type CardTwo struct {
+	ID               uint64
+	UserId           uint64
+	FirstName        string
+	LastName         string
+	Email            string
+	CountryCode      string
+	Phone            string
+	City             string
+	Country          string
+	Street           string
+	PostalCode       string
+	BirthDate        string
+	PhoneCountryCode string
+	State            string
+	Status           uint64
+	CardId           string
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+}
+
 type User struct {
 	ID               uint64
 	Address          string
@@ -144,6 +165,7 @@ type UserRepo interface {
 	GetConfigByKeys(keys ...string) ([]*Config, error)
 	GetUserByAddress(address string) (*User, error)
 	GetUserByCard(card string) (*User, error)
+	GetUsersStatusDoing() ([]*User, error)
 	GetUserByCardUserId(cardUserId string) (*User, error)
 	GetUserById(userId uint64) (*User, error)
 	GetUserRecommendByUserId(userId uint64) (*UserRecommend, error)
@@ -184,9 +206,11 @@ type UserRepo interface {
 	GetConfigs() ([]*Config, error)
 	UpdateConfig(ctx context.Context, id int64, value string) (bool, error)
 	UpdateUserInfo(ctx context.Context, userId uint64, user *User) error
-	CreateCardNew(ctx context.Context, in *Card) error
+	CreateCardOne(ctx context.Context, userId uint64, in *Card) error
+	CreateCardNew(ctx context.Context, userId, id uint64, in *Card) error
 	GetCardPage(ctx context.Context, b *Pagination, accountId, status string) ([]*Card, error, int64)
 	GetLatestCard(ctx context.Context) (*Card, error)
+	GetCardTwoStatusOne() ([]*CardTwo, error)
 }
 
 type UserUseCase struct {
@@ -1250,65 +1274,36 @@ func (uuc *UserUseCase) UpdateUserInfoTo(ctx transporthttp.Context) error {
 }
 
 func (uuc *UserUseCase) UpdateAllCard(ctx context.Context, req *pb.UpdateAllCardRequest) (*pb.UpdateAllCardReply, error) {
-	const (
-		pageSize = 100
+	var (
+		cardTwo []*CardTwo
+		err     error
 	)
 
-	// 1. 先拿第一页，顺便拿到 total
-	firstCards, totalStr, err := InterlaceListCards(ctx, &InterlaceListCardsReq{
-		AccountId: interlaceAccountId,
-		Page:      1,
-		Limit:     pageSize,
-	})
-	if err != nil {
-		fmt.Println("InterlaceListCards page 1 error:", err)
+	cardTwo, err = uuc.repo.GetCardTwoStatusOne()
+	if nil != err {
+		fmt.Println("update all card error:", err)
 		return nil, err
 	}
-
-	if totalStr == "" {
-		fmt.Println("no cards, total = 0")
-		return &pb.UpdateAllCardReply{}, nil
-	}
-
-	total, err := strconv.ParseInt(totalStr, 10, 64)
-	if err != nil {
-		fmt.Println("InterlaceListCards parse total error:", err)
-		return nil, err
-	}
-
-	if total <= 0 {
-		fmt.Println("no cards, total <= 0")
-		return &pb.UpdateAllCardReply{}, nil
-	}
-
-	// 计算总页数： (total + pageSize - 1) / pageSize
-	pageCount := int((total + int64(pageSize) - 1) / int64(pageSize))
-	if pageCount <= 0 {
-		pageCount = 1
-	}
-
-	fmt.Printf("start sync cards, total=%d, pageCount=%d\n", total, pageCount)
 
 	// 把第一页也放到统一处理逻辑里
-	for page := 1; page <= pageCount; page++ {
-		var cards []*InterlaceCard
-		if page == 1 {
-			cards = firstCards
-		} else {
-			// 每次请求间隔 100ms
-			time.Sleep(100 * time.Millisecond)
+	for _, v := range cardTwo {
+		if 10 > len(v.CardId) {
+			fmt.Println("cardTwo card error:", cardTwo)
+			continue
+		}
 
-			cs, _, errTwo := InterlaceListCards(ctx, &InterlaceListCardsReq{
-				AccountId: interlaceAccountId,
-				Page:      page,
-				Limit:     pageSize,
-			})
-			if errTwo != nil {
-				fmt.Println("InterlaceListCards page", page, "error:", errTwo)
-				// 拉失败这一页就跳过，继续后面的
-				continue
-			}
-			cards = cs
+		var cards []*InterlaceCard
+
+		cards, _, errTwo := InterlaceListCards(ctx, &InterlaceListCardsReq{
+			AccountId: interlaceAccountId,
+			CardId:    v.CardId,
+			Page:      1,
+			Limit:     10,
+		})
+		if nil == cards || errTwo != nil {
+			fmt.Println("InterlaceListCards page", "error:", errTwo)
+			// 拉失败这一页就跳过，继续后面的
+			continue
 		}
 
 		if len(cards) == 0 {
@@ -1321,13 +1316,8 @@ func (uuc *UserUseCase) UpdateAllCard(ctx context.Context, req *pb.UpdateAllCard
 				continue
 			}
 
-			// 数据库中没有这条 card 则插入
-			exists, errHas := uuc.repo.HasCardByCardID(ctx, ic.ID)
-			if errHas != nil {
-				fmt.Println("HasCardByCardID error, cardID =", ic.ID, "err =", errHas)
-				continue
-			}
-			if exists {
+			if ic.CardMode != "PHYSICAL_CARD" {
+				fmt.Println("模式错误", ic, v)
 				continue
 			}
 
@@ -1357,7 +1347,7 @@ func (uuc *UserUseCase) UpdateAllCard(ctx context.Context, req *pb.UpdateAllCard
 				InterlaceCreateTime: tmpCreateTime, // 毫秒时间戳
 			}
 
-			if errTwo := uuc.repo.CreateCardNew(ctx, card); errTwo != nil {
+			if errThree := uuc.repo.CreateCardNew(ctx, v.UserId, v.ID, card); errThree != nil {
 				fmt.Println("CreateCard error, cardID =", ic.ID, "err =", err)
 				// 这条失败就算了，不影响其它
 				continue
@@ -1368,133 +1358,85 @@ func (uuc *UserUseCase) UpdateAllCard(ctx context.Context, req *pb.UpdateAllCard
 	return &pb.UpdateAllCardReply{}, nil
 }
 
-func (uuc *UserUseCase) UpdateAllCardBak(ctx context.Context, req *pb.UpdateAllCardRequest) (*pb.UpdateAllCardReply, error) {
-	const (
-		pageSize = 100
-		maxPages = 200
+func (uuc *UserUseCase) UpdateAllCardTwo(ctx context.Context, req *pb.UpdateAllCardRequest) (*pb.UpdateAllCardReply, error) {
+	var (
+		users []*User
+		err   error
 	)
 
-	// 1. 先从数据库拿最新一条卡片（按 InterlaceCreateTime 倒序）
-	latest, err := uuc.repo.GetLatestCard(ctx)
-	if err != nil {
-		fmt.Println("GetLatestCard error:", err)
+	users, err = uuc.repo.GetUsersStatusDoing()
+	if nil != err {
+		fmt.Println("update all card error:", err)
 		return nil, err
 	}
 
-	var lastCreateTime int64
-	var lastCardID string
-	if latest != nil {
-		lastCreateTime = latest.InterlaceCreateTime
-		lastCardID = latest.CardID
-	}
+	// 把第一页也放到统一处理逻辑里
+	for _, v := range users {
+		if 10 > len(v.CardNumber) {
+			fmt.Println("cardOne card error:", v)
+			continue
+		}
 
-	// 用来收集本次拉到的“新卡片”（按接口返回顺序：最新在前）
-	newCards := make([]*InterlaceCard, 0, pageSize)
+		var cards []*InterlaceCard
 
-	stop := false
-
-	// 2. 从第 1 页开始，最多扫 200 页（真实业务量远小于这个）
-	for page := 1; page <= maxPages; page++ {
 		cards, _, errTwo := InterlaceListCards(ctx, &InterlaceListCardsReq{
 			AccountId: interlaceAccountId,
-			Page:      page,
-			Limit:     pageSize,
+			CardId:    v.CardNumber,
+			Page:      1,
+			Limit:     10,
 		})
-		if errTwo != nil {
-			fmt.Println("InterlaceListCards page", page, "error:", errTwo)
-			// 出错就整体结束本次同步，避免老数据乱插
-			break
+		if nil == cards || errTwo != nil {
+			fmt.Println("InterlaceListCards page", "error:", errTwo)
+			// 拉失败这一页就跳过，继续后面的
+			continue
 		}
 
 		if len(cards) == 0 {
-			// 没有更多数据了
-			break
+			continue
 		}
 
-		for _, c := range cards {
-			// 如果本地还没有任何卡片记录，直接全部当作新卡收集
-			if lastCreateTime == 0 {
-				newCards = append(newCards, c)
+		for _, ic := range cards {
+			// 只保留 ACTIVE
+			if ic.Status != "ACTIVE" {
 				continue
 			}
 
-			// 规则：
-			// 如果 createTime >= lastCreateTime 且 CardID != lastCardID → 收集
-			// 否则 break，说明已经对齐到旧数据
+			if ic.CardMode != "VIRTUAL_CARD" {
+				fmt.Println("模式错误", ic, v)
+				continue
+			}
 
 			var tmpCreateTime int64
-			tmpCreateTime, err = strconv.ParseInt(c.CreateTime, 10, 64)
+			tmpCreateTime, err = strconv.ParseInt(ic.CreateTime, 10, 64)
 			if 0 >= tmpCreateTime || nil != err {
-				fmt.Println("InterlaceListCards create time", c, "error:", errTwo)
+				fmt.Println("InterlaceListCards create time", ic, "error:", err)
 				// 出错就整体结束本次同步，避免老数据乱插
 				break
 			}
 
-			if tmpCreateTime >= lastCreateTime && c.ID != lastCardID {
-				newCards = append(newCards, c)
-				continue
+			// 组装 biz.Card 对象
+			card := &Card{
+				CardID:              ic.ID,
+				AccountID:           ic.AccountID,
+				CardholderID:        ic.CardholderID,
+				BalanceID:           ic.BalanceID,
+				BudgetID:            ic.BudgetID,
+				ReferenceID:         ic.ReferenceID,
+				UserName:            ic.UserName,
+				Currency:            ic.Currency,
+				Bin:                 ic.Bin,
+				Status:              ic.Status,
+				CardMode:            ic.CardMode,
+				Label:               ic.Label,
+				CardLastFour:        ic.CardLastFour,
+				InterlaceCreateTime: tmpCreateTime, // 毫秒时间戳
 			}
 
-			// 进入这里说明：
-			//  - c.CreateTime < lastCreateTime，或者
-			//  - c.CreateTime == lastCreateTime 且 c.ID == lastCardID（精确对齐到最新一条）
-			// 说明后面都更旧，不需要再看，直接整体结束
-			stop = true
-			break
-		}
-
-		if stop {
-			break
-		}
-
-		// 这一页不足 pageSize，说明已经到底了
-		if len(cards) < pageSize {
-			break
-		}
-	}
-
-	if len(newCards) == 0 {
-		fmt.Println("no new cards")
-		return &pb.UpdateAllCardReply{}, nil
-	}
-
-	// 3. 反转 newCards，让“最旧的在前、最新的在后”
-	// 这样插入 DB 时，自动增长 ID 会保证最新的在最后一条，方便下次查“最新一条”
-	for i, j := 0, len(newCards)-1; i < j; i, j = i+1, j-1 {
-		newCards[i], newCards[j] = newCards[j], newCards[i]
-	}
-
-	// 4. 统一插入数据库（这里用 CreateCard 单条插入，你要批量插入也可以搞个 Batch 接口）
-	for _, ic := range newCards {
-		var tmpCreateTime int64
-		tmpCreateTime, err = strconv.ParseInt(ic.CreateTime, 10, 64)
-		if 0 >= tmpCreateTime || nil != err {
-			fmt.Println("InterlaceListCards create time", ic, "error:", err)
-			// 出错就整体结束本次同步，避免老数据乱插
-			break
-		}
-
-		card := &Card{
-			CardID:              ic.ID,
-			AccountID:           ic.AccountID,
-			CardholderID:        ic.CardholderID,
-			BalanceID:           ic.BalanceID,
-			BudgetID:            ic.BudgetID,
-			ReferenceID:         ic.ReferenceID,
-			UserName:            ic.UserName,
-			Currency:            ic.Currency,
-			Bin:                 ic.Bin,
-			Status:              ic.Status,
-			CardMode:            ic.CardMode,
-			Label:               ic.Label,
-			CardLastFour:        ic.CardLastFour,
-			InterlaceCreateTime: tmpCreateTime, // 注意：这里是毫秒时间戳
-		}
-
-		if errTwo := uuc.repo.CreateCardNew(ctx, card); errTwo != nil {
-			fmt.Println("CreateCard error, cardID =", ic.ID, "err =", err)
-			// 这里我选择 continue，尽量插入后面的；你要严格一点也可以直接 return
-			continue
+			if errThree := uuc.repo.CreateCardOne(ctx, v.ID, card); errThree != nil {
+				fmt.Println("CreateCardOne error, cardID =", ic.ID, "err =", err)
+				// 这条失败就算了，不影响其它
+				continue
+			}
 		}
 	}
 
@@ -2479,8 +2421,8 @@ func InterlaceCreateCardholderMOR(
 	email string,
 	firstName string,
 	lastName string,
-	dob string, // YYYY-MM-DD
-	gender string, // "M" / "F"
+	dob string,         // YYYY-MM-DD
+	gender string,      // "M" / "F"
 	nationality string, // ISO2, e.g. "CN"
 	nationalId string,
 	idType string, // "CN-RIC" / "PASSPORT" / ...
