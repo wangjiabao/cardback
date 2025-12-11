@@ -2479,8 +2479,8 @@ func InterlaceCreateCardholderMOR(
 	email string,
 	firstName string,
 	lastName string,
-	dob string,         // YYYY-MM-DD
-	gender string,      // "M" / "F"
+	dob string, // YYYY-MM-DD
+	gender string, // "M" / "F"
 	nationality string, // ISO2, e.g. "CN"
 	nationalId string,
 	idType string, // "CN-RIC" / "PASSPORT" / ...
@@ -2826,7 +2826,6 @@ func InterlaceListCards(ctx context.Context, in *InterlaceListCardsReq) ([]*Inte
 		return nil, "", err
 	}
 
-	fmt.Println(string(body))
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, "", fmt.Errorf("interlace list cards http %d: %s", resp.StatusCode, string(body))
 	}
