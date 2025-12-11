@@ -2580,7 +2580,7 @@ func InterlaceListCards(ctx context.Context, in *InterlaceListCardsReq) ([]*Inte
 		Message string `json:"message"`
 		Data    struct {
 			List  []InterlaceCard `json:"list"`
-			Total int64           `json:"total"`
+			Total string          `json:"total"`
 		} `json:"data"`
 	}
 
