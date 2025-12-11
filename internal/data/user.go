@@ -1471,6 +1471,7 @@ func (u *UserRepo) CreateCardNew(ctx context.Context, userId, id uint64, in *biz
 	c.CardLastFour = in.CardLastFour
 
 	c.InterlaceCreateTime = in.InterlaceCreateTime
+	c.UserId = int64(userId)
 
 	resInsert := u.data.DB(ctx).Table("card").Create(&c)
 	if resInsert.Error != nil || resInsert.RowsAffected <= 0 {
@@ -1509,6 +1510,7 @@ func (u *UserRepo) CreateCardOne(ctx context.Context, userId uint64, in *biz.Car
 	c.CardLastFour = in.CardLastFour
 
 	c.InterlaceCreateTime = in.InterlaceCreateTime
+	c.UserId = int64(userId)
 
 	resInsert := u.data.DB(ctx).Table("card").Create(&c)
 	if resInsert.Error != nil || resInsert.RowsAffected <= 0 {
