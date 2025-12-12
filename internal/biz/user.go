@@ -1157,7 +1157,7 @@ func (uuc *UserUseCase) AdminCardTwoList(ctx context.Context, req *pb.AdminCardT
 
 	userIds = make([]uint64, 0)
 	for _, vUsers := range cards {
-		userIds = append(userIds, vUsers.ID)
+		userIds = append(userIds, vUsers.UserId)
 	}
 
 	usersMap, err = uuc.repo.GetUserByUserIdsTwo(userIds)
