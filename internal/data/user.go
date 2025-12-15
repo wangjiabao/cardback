@@ -1494,6 +1494,8 @@ func (u *UserRepo) CreateCardNew(ctx context.Context, userId, id uint64, in *biz
 		Updates(map[string]interface{}{
 			"card_two_number": in.CardID,
 			"card_two":        2,
+			"lock_card_two":   0,
+			"change_card_two": 0,
 			"updated_at":      time.Now().Format("2006-01-02 15:04:05"),
 		})
 	if resTwo.Error != nil || 0 >= resTwo.RowsAffected {
@@ -1565,6 +1567,8 @@ func (u *UserRepo) CreateCardOne(ctx context.Context, userId uint64, in *biz.Car
 	resTwo := u.data.DB(ctx).Table("user").Where("id=?", userId).
 		Updates(map[string]interface{}{
 			"card_order_id": "success",
+			"lock_card":     0,
+			"change_card":   0,
 			"updated_at":    time.Now().Format("2006-01-02 15:04:05"),
 		})
 	if resTwo.Error != nil || 0 >= resTwo.RowsAffected {
