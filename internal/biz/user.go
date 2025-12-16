@@ -93,6 +93,14 @@ type User struct {
 	CanVip           uint64
 	UserCount        uint64
 	CardTwoNumber    string
+	LockCard         uint64
+	LockCardTwo      uint64
+	ChangeCard       uint64
+	ChangeCardTwo    uint64
+	Pic              string
+	PicTwo           string
+	CardNumberRel    string
+	CardNumberRelTwo string
 }
 
 type UserRecommend struct {
@@ -203,7 +211,7 @@ type UserRepo interface {
 	InsertCardRecord(ctx context.Context, userId, recordType uint64, remark string, code string, opt string) error
 	UpdateCardTwo(ctx context.Context, id uint64) error
 	GetUserCardTwo() ([]*Reward, error)
-	GetUsers(b *Pagination, address string, cardTwo uint64, cardOrderId string) ([]*User, error, int64)
+	GetUsers(b *Pagination, address string, cardTwo uint64, cardOrderId string, lockCard uint64, changeCard uint64) ([]*User, error, int64)
 	GetAdminByAccount(ctx context.Context, account string, password string) (*Admin, error)
 	SetCanVip(ctx context.Context, userId uint64, lock uint64) (bool, error)
 	SetVipThree(ctx context.Context, userId uint64, vipThree uint64) (bool, error)
@@ -216,9 +224,10 @@ type UserRepo interface {
 	GetCardPage(ctx context.Context, b *Pagination, accountId, status string) ([]*Card, error, int64)
 	GetLatestCard(ctx context.Context) (*Card, error)
 	GetCardTwoStatusOne() ([]*CardTwo, error)
-	UpdateUserDoing(ctx context.Context, userId uint64, cardNumber string, cardAmount float64) error
-	UpdateCardStatus(ctx context.Context, id uint64, cardNumber string, cardAmount float64) error
+	UpdateUserDoing(ctx context.Context, userId uint64, cardNumber, cardNumberRel string, cardAmount float64) error
+	UpdateCardStatus(ctx context.Context, id, userId uint64, cardNumber, cardNumberRel string, cardAmount float64) error
 	GetCardTwos(b *Pagination, userId uint64, status uint64, cardId string) ([]*CardTwo, error, int64)
+	GetCardTwoById(id uint64) (*CardTwo, error)
 }
 
 type UserUseCase struct {
@@ -673,22 +682,30 @@ func (uuc *UserUseCase) CardTwoStatusHandle(ctx context.Context) error {
 
 	var (
 		configs       []*Config
+		vipThreeFive  uint64
+		vipThreeFour  uint64
 		vipThreeThree uint64
 		vipThreeTwo   uint64
 		vipThreeOne   uint64
 	)
 
 	// 配置
-	configs, err = uuc.repo.GetConfigByKeys("vip_three_three", "vip_three_two", "vip_three_one")
+	configs, err = uuc.repo.GetConfigByKeys("new_vip_three_five", "new_vip_three_four", "new_vip_three_one", "new_vip_three_two", "new_vip_three_three")
 	if nil != configs {
 		for _, vConfig := range configs {
-			if "vip_three_three" == vConfig.KeyName {
+			if "new_vip_three_five" == vConfig.KeyName {
+				vipThreeFive, _ = strconv.ParseUint(vConfig.Value, 10, 64)
+			}
+			if "new_vip_three_four" == vConfig.KeyName {
+				vipThreeFour, _ = strconv.ParseUint(vConfig.Value, 10, 64)
+			}
+			if "new_vip_three_three" == vConfig.KeyName {
 				vipThreeThree, _ = strconv.ParseUint(vConfig.Value, 10, 64)
 			}
-			if "vip_three_two" == vConfig.KeyName {
+			if "new_vip_three_two" == vConfig.KeyName {
 				vipThreeTwo, _ = strconv.ParseUint(vConfig.Value, 10, 64)
 			}
-			if "vip_three_one" == vConfig.KeyName {
+			if "new_vip_three_one" == vConfig.KeyName {
 				vipThreeOne, _ = strconv.ParseUint(vConfig.Value, 10, 64)
 			}
 		}
@@ -756,12 +773,12 @@ func (uuc *UserUseCase) CardTwoStatusHandle(ctx context.Context) error {
 			tmpRecommendUserIds = strings.Split(userRecommend.RecommendCode, "D")
 		}
 
-		tmpTopVip := uint64(3)
+		tmpTopVip := uint64(5)
 		totalTmp := len(tmpRecommendUserIds) - 1
 		lastVip := uint64(0)
 		lastAmount := uint64(0)
 		for i := totalTmp; i >= 0; i-- {
-			if vipThreeThree <= lastAmount {
+			if vipThreeFive <= lastAmount {
 				break
 			}
 
@@ -812,6 +829,22 @@ func (uuc *UserUseCase) CardTwoStatusHandle(ctx context.Context) error {
 
 				tmpAmount = vipThreeThree - lastAmount
 				lastAmount = vipThreeThree
+			} else if 4 == usersMap[tmpUserId].VipThree {
+				if vipThreeFour <= lastAmount {
+					fmt.Println("开卡2遍历，vip奖励信息设置错误4：", usersMap[tmpUserId], lastVip, vipThreeFour, lastAmount)
+					continue
+				}
+
+				tmpAmount = vipThreeFour - lastAmount
+				lastAmount = vipThreeFour
+			} else if 5 == usersMap[tmpUserId].VipThree {
+				if vipThreeFive <= lastAmount {
+					fmt.Println("开卡2遍历，vip奖励信息设置错误5：", usersMap[tmpUserId], lastVip, vipThreeFive, lastAmount)
+					continue
+				}
+
+				tmpAmount = vipThreeFive - lastAmount
+				lastAmount = vipThreeFive
 			} else {
 				continue
 			}
@@ -978,7 +1011,7 @@ func (uuc *UserUseCase) AdminUserList(ctx context.Context, req *pb.AdminUserList
 	users, err, count = uuc.repo.GetUsers(&Pagination{
 		PageNum:  int(req.Page),
 		PageSize: 10,
-	}, req.Address, req.CardTwo, req.CardOrderId)
+	}, req.Address, req.CardTwo, req.CardOrderId, req.LockCard, req.ChangeCard)
 	if nil != err {
 		return res, nil
 	}
@@ -1091,6 +1124,14 @@ func (uuc *UserUseCase) AdminUserList(ctx context.Context, req *pb.AdminUserList
 			CardTwoNumber:      vUsers.CardTwoNumber,
 			CardOrderId:        vUsers.CardOrderId,
 			CardTwo:            vUsers.CardTwo,
+			PicTwo:             vUsers.PicTwo,
+			Pic:                vUsers.Pic,
+			ChangeCard:         vUsers.ChangeCard,
+			ChangeCardTwo:      vUsers.ChangeCardTwo,
+			LockCard:           vUsers.LockCard,
+			LockCardTwo:        vUsers.LockCardTwo,
+			CardNumberRel:      vUsers.CardNumberRel,
+			CardNumberRelTwo:   vUsers.CardNumberRelTwo,
 		})
 	}
 
@@ -1107,7 +1148,7 @@ func (uuc *UserUseCase) AdminUserBind(ctx context.Context, req *pb.AdminUserBind
 		return &pb.AdminUserBindReply{}, err
 	}
 
-	if errThree := uuc.repo.UpdateUserDoing(ctx, user.ID, req.SendBody.CardId, req.SendBody.Amount); errThree != nil {
+	if errThree := uuc.repo.UpdateUserDoing(ctx, user.ID, req.SendBody.CardId, req.SendBody.CarNum, req.SendBody.Amount); errThree != nil {
 		fmt.Println("AdminUserBind", "err =", err)
 		// 这条失败就算了，不影响其它
 		return &pb.AdminUserBindReply{}, err
@@ -1118,9 +1159,15 @@ func (uuc *UserUseCase) AdminUserBind(ctx context.Context, req *pb.AdminUserBind
 
 func (uuc *UserUseCase) AdminUserBindTwo(ctx context.Context, req *pb.AdminUserBindTwoRequest) (*pb.AdminUserBindTwoReply, error) {
 	var (
-		err error
+		cardTwo *CardTwo
+		err     error
 	)
-	if errThree := uuc.repo.UpdateCardStatus(ctx, req.SendBody.Id, req.SendBody.CardId, req.SendBody.Amount); errThree != nil {
+	cardTwo, err = uuc.repo.GetCardTwoById(req.SendBody.Id)
+	if nil != err || nil == cardTwo {
+		return nil, err
+	}
+
+	if errThree := uuc.repo.UpdateCardStatus(ctx, req.SendBody.Id, cardTwo.UserId, req.SendBody.CardId, req.SendBody.CarNum, req.SendBody.Amount); errThree != nil {
 		fmt.Println("AdminUserBindTwo", "err =", err)
 		// 这条失败就算了，不影响其它
 		return &pb.AdminUserBindTwoReply{}, err
@@ -1131,21 +1178,32 @@ func (uuc *UserUseCase) AdminUserBindTwo(ctx context.Context, req *pb.AdminUserB
 
 func (uuc *UserUseCase) AdminCardTwoList(ctx context.Context, req *pb.AdminCardTwoRequest) (*pb.AdminCardTwoReply, error) {
 	var (
-		cards    []*CardTwo
-		userIds  []uint64
-		usersMap map[uint64]*User
-		count    int64
-		err      error
+		cards     []*CardTwo
+		userIds   []uint64
+		usersMap  map[uint64]*User
+		count     int64
+		err       error
+		tmpUserId uint64
+		sUser     *User
 	)
 
 	res := &pb.AdminCardTwoReply{
 		Users: make([]*pb.AdminCardTwoReply_EntityCardUser, 0),
 	}
 
+	if 0 < len(req.Address) {
+		sUser, err = uuc.repo.GetUserByAddress(req.Address)
+		if nil != err || nil == sUser {
+			return res, nil
+		}
+
+		tmpUserId = sUser.ID
+	}
+
 	cards, err, count = uuc.repo.GetCardTwos(&Pagination{
 		PageNum:  int(req.Page),
 		PageSize: 10,
-	}, 0, req.Status, "")
+	}, tmpUserId, req.Status, "")
 	if nil != err {
 		return res, nil
 	}

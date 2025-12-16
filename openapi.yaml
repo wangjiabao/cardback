@@ -409,6 +409,14 @@ paths:
                   in: query
                   schema:
                     type: string
+                - name: lockCard
+                  in: query
+                  schema:
+                    type: string
+                - name: changeCard
+                  in: query
+                  schema:
+                    type: string
             responses:
                 "200":
                     description: OK
@@ -588,6 +596,8 @@ components:
                     type: string
                 cardId:
                     type: string
+                carNum:
+                    type: string
         AdminUserBindTwoReply:
             type: object
             properties:
@@ -602,6 +612,8 @@ components:
                 id:
                     type: string
                 cardId:
+                    type: string
+                carNum:
                     type: string
         AdminUserListReply:
             type: object
@@ -642,6 +654,22 @@ components:
                 cardOrderId:
                     type: string
                 cardTwo:
+                    type: string
+                pic:
+                    type: string
+                picTwo:
+                    type: string
+                lockCard:
+                    type: string
+                lockCardTwo:
+                    type: string
+                changeCard:
+                    type: string
+                changeCardTwo:
+                    type: string
+                CardNumberRel:
+                    type: string
+                CardNumberRelTwo:
                     type: string
         AdminWithdrawEthReply:
             type: object

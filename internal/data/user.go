@@ -12,38 +12,46 @@ import (
 )
 
 type User struct {
-	ID            uint64    `gorm:"primarykey;type:int"`
-	Address       string    `gorm:"type:varchar(100);default:'no'"`
-	Card          string    `gorm:"type:varchar(100);not null;default:'no'"`
-	CardOrderId   string    `gorm:"type:varchar(100);not null;default:'no'"`
-	CardNumber    string    `gorm:"type:varchar(100);not null;default:'no'"`
-	CardTwoNumber string    `gorm:"type:varchar(100);not null;default:'no'"`
-	CardAmount    float64   `gorm:"type:decimal(65,20);not null"`
-	Amount        float64   `gorm:"type:decimal(65,20)"`
-	IsDelete      uint64    `gorm:"type:int"`
-	Vip           uint64    `gorm:"type:int"`
-	MyTotalAmount uint64    `gorm:"type:bigint"`
-	AmountTwo     uint64    `gorm:"type:bigint"`
-	CardUserId    string    `gorm:"type:varchar(45);not null;default:'0'"`
-	FirstName     string    `gorm:"type:varchar(45);not null;default:'no'"`
-	LastName      string    `gorm:"type:varchar(45);not null;default:'no'"`
-	BirthDate     string    `gorm:"type:varchar(45);not null;default:'no'"`
-	Email         string    `gorm:"type:varchar(100);not null;default:'no'"`
-	CountryCode   string    `gorm:"type:varchar(45);not null;default:'no'"`
-	Phone         string    `gorm:"type:varchar(45);not null;default:'no'"`
-	City          string    `gorm:"type:varchar(100);not null;default:'no'"`
-	Country       string    `gorm:"type:varchar(100);not null;default:'no'"`
-	Street        string    `gorm:"type:varchar(100);not null;default:'no'"`
-	PostalCode    string    `gorm:"type:varchar(45);not null;default:'no'"`
-	MaxCardQuota  uint64    `gorm:"type:bigint"`
-	ProductId     string    `gorm:"type:varchar(45);not null;default:'0'"`
-	CreatedAt     time.Time `gorm:"type:datetime;not null"`
-	UpdatedAt     time.Time `gorm:"type:datetime;not null"`
-	VipTwo        uint64    `gorm:"type:int"`
-	VipThree      uint64    `gorm:"type:int"`
-	CardTwo       uint64    `gorm:"type:int"`
-	CanVip        uint64    `gorm:"type:int"`
-	UserCount     uint64    `gorm:"type:int"`
+	ID               uint64    `gorm:"primarykey;type:int"`
+	Address          string    `gorm:"type:varchar(100);default:'no'"`
+	Card             string    `gorm:"type:varchar(100);not null;default:'no'"`
+	CardOrderId      string    `gorm:"type:varchar(100);not null;default:'no'"`
+	CardNumber       string    `gorm:"type:varchar(100);not null;default:'no'"`
+	CardTwoNumber    string    `gorm:"type:varchar(100);not null;default:'no'"`
+	CardAmount       float64   `gorm:"type:decimal(65,20);not null"`
+	Amount           float64   `gorm:"type:decimal(65,20)"`
+	IsDelete         uint64    `gorm:"type:int"`
+	Vip              uint64    `gorm:"type:int"`
+	MyTotalAmount    uint64    `gorm:"type:bigint"`
+	AmountTwo        uint64    `gorm:"type:bigint"`
+	CardUserId       string    `gorm:"type:varchar(45);not null;default:'0'"`
+	FirstName        string    `gorm:"type:varchar(45);not null;default:'no'"`
+	LastName         string    `gorm:"type:varchar(45);not null;default:'no'"`
+	BirthDate        string    `gorm:"type:varchar(45);not null;default:'no'"`
+	Email            string    `gorm:"type:varchar(100);not null;default:'no'"`
+	CountryCode      string    `gorm:"type:varchar(45);not null;default:'no'"`
+	Phone            string    `gorm:"type:varchar(45);not null;default:'no'"`
+	City             string    `gorm:"type:varchar(100);not null;default:'no'"`
+	Country          string    `gorm:"type:varchar(100);not null;default:'no'"`
+	Street           string    `gorm:"type:varchar(100);not null;default:'no'"`
+	PostalCode       string    `gorm:"type:varchar(45);not null;default:'no'"`
+	MaxCardQuota     uint64    `gorm:"type:bigint"`
+	ProductId        string    `gorm:"type:varchar(45);not null;default:'0'"`
+	CreatedAt        time.Time `gorm:"type:datetime;not null"`
+	UpdatedAt        time.Time `gorm:"type:datetime;not null"`
+	VipTwo           uint64    `gorm:"type:int"`
+	VipThree         uint64    `gorm:"type:int"`
+	CardTwo          uint64    `gorm:"type:int"`
+	CanVip           uint64    `gorm:"type:int"`
+	UserCount        uint64    `gorm:"type:int"`
+	LockCard         uint64    `gorm:"type:int"`
+	LockCardTwo      uint64    `gorm:"type:int"`
+	ChangeCard       uint64    `gorm:"type:int"`
+	ChangeCardTwo    uint64    `gorm:"type:int"`
+	Pic              string    `gorm:"type:varchar(45);not null;default:'no'"`
+	PicTwo           string    `gorm:"type:varchar(45);not null;default:'no'"`
+	CardNumberRel    string    `gorm:"type:varchar(100);not null;default:'no'"`
+	CardNumberRelTwo string    `gorm:"type:varchar(100);not null;default:'no'"`
 }
 
 type CardTwo struct {
@@ -1207,7 +1215,7 @@ func (u *UserRepo) GetUserCardTwo() ([]*biz.Reward, error) {
 }
 
 // GetUsers .
-func (u *UserRepo) GetUsers(b *biz.Pagination, address string, cardTwo uint64, cardOrderId string) ([]*biz.User, error, int64) {
+func (u *UserRepo) GetUsers(b *biz.Pagination, address string, cardTwo uint64, cardOrderId string, lockCard uint64, changeCard uint64) ([]*biz.User, error, int64) {
 	var (
 		users []*User
 		count int64
@@ -1217,12 +1225,24 @@ func (u *UserRepo) GetUsers(b *biz.Pagination, address string, cardTwo uint64, c
 		instance = instance.Where("address=?", address)
 	}
 
-	if "" != cardOrderId {
+	if "all" != cardOrderId {
 		instance = instance.Where("card_order_id=?", cardOrderId)
 	}
 
-	if 0 < cardTwo {
+	if 3 != cardTwo {
 		instance = instance.Where("card_two=?", cardTwo)
+	}
+
+	if 1 == lockCard {
+		instance = instance.Where("lock_card=?", 1)
+	} else if 2 == lockCard {
+		instance = instance.Where("lock_card_two=?", 1)
+	}
+
+	if 1 == changeCard {
+		instance = instance.Where("change_card=?", 1)
+	} else if 2 == changeCard {
+		instance = instance.Where("change_card_two=?", 1)
 	}
 
 	instance = instance.Count(&count)
@@ -1237,38 +1257,46 @@ func (u *UserRepo) GetUsers(b *biz.Pagination, address string, cardTwo uint64, c
 	res := make([]*biz.User, 0)
 	for _, user := range users {
 		res = append(res, &biz.User{
-			ID:            user.ID,
-			Address:       user.Address,
-			Card:          user.Card,
-			CardNumber:    user.CardNumber,
-			CardOrderId:   user.CardOrderId,
-			CardAmount:    user.CardAmount,
-			Amount:        user.Amount,
-			AmountTwo:     user.AmountTwo,
-			MyTotalAmount: user.MyTotalAmount,
-			IsDelete:      user.IsDelete,
-			Vip:           user.Vip,
-			FirstName:     user.FirstName,
-			LastName:      user.LastName,
-			BirthDate:     user.BirthDate,
-			Email:         user.Email,
-			CountryCode:   user.CountryCode,
-			Phone:         user.Phone,
-			City:          user.City,
-			Country:       user.Country,
-			Street:        user.Street,
-			PostalCode:    user.PostalCode,
-			CardUserId:    user.CardUserId,
-			ProductId:     user.ProductId,
-			MaxCardQuota:  user.MaxCardQuota,
-			CreatedAt:     user.CreatedAt,
-			UpdatedAt:     user.UpdatedAt,
-			VipTwo:        user.VipTwo,
-			VipThree:      user.VipThree,
-			CanVip:        user.CanVip,
-			CardTwo:       user.CardTwo,
-			UserCount:     user.UserCount,
-			CardTwoNumber: user.CardTwoNumber,
+			ID:               user.ID,
+			Address:          user.Address,
+			Card:             user.Card,
+			CardNumber:       user.CardNumber,
+			CardOrderId:      user.CardOrderId,
+			CardAmount:       user.CardAmount,
+			Amount:           user.Amount,
+			AmountTwo:        user.AmountTwo,
+			MyTotalAmount:    user.MyTotalAmount,
+			IsDelete:         user.IsDelete,
+			Vip:              user.Vip,
+			FirstName:        user.FirstName,
+			LastName:         user.LastName,
+			BirthDate:        user.BirthDate,
+			Email:            user.Email,
+			CountryCode:      user.CountryCode,
+			Phone:            user.Phone,
+			City:             user.City,
+			Country:          user.Country,
+			Street:           user.Street,
+			PostalCode:       user.PostalCode,
+			CardUserId:       user.CardUserId,
+			ProductId:        user.ProductId,
+			MaxCardQuota:     user.MaxCardQuota,
+			CreatedAt:        user.CreatedAt,
+			UpdatedAt:        user.UpdatedAt,
+			VipTwo:           user.VipTwo,
+			VipThree:         user.VipThree,
+			CanVip:           user.CanVip,
+			CardTwo:          user.CardTwo,
+			UserCount:        user.UserCount,
+			CardTwoNumber:    user.CardTwoNumber,
+			Pic:              user.Pic,
+			PicTwo:           user.PicTwo,
+			LockCard:         user.LockCard,
+			LockCardTwo:      user.LockCardTwo,
+			ChangeCardTwo:    user.ChangeCardTwo,
+			ChangeCard:       user.ChangeCard,
+			CardNumberRel:    user.CardNumberRel,
+			CardNumberRelTwo: user.CardNumberRelTwo,
 		})
 	}
 	return res, nil, count
@@ -1531,13 +1559,14 @@ func (u *UserRepo) CreateCardNew(ctx context.Context, userId, id uint64, in *biz
 }
 
 // UpdateUserDoing 创建一条卡片记录
-func (u *UserRepo) UpdateUserDoing(ctx context.Context, userId uint64, cardNumber string, cardAmount float64) error {
+func (u *UserRepo) UpdateUserDoing(ctx context.Context, userId uint64, cardNumber, cardNumberRel string, cardAmount float64) error {
 	resTwo := u.data.DB(ctx).Table("user").Where("id=?", userId).
 		Updates(map[string]interface{}{
-			"card_order_id": "doing",
-			"card_number":   cardNumber,
-			"card_amount":   cardAmount,
-			"updated_at":    time.Now().Format("2006-01-02 15:04:05"),
+			"card_order_id":   "doing",
+			"card_number":     cardNumber,
+			"card_amount":     cardAmount,
+			"card_number_rel": cardNumberRel,
+			"updated_at":      time.Now().Format("2006-01-02 15:04:05"),
 		})
 	if resTwo.Error != nil || 0 >= resTwo.RowsAffected {
 		return errors.New(500, "CreateCardOne", "用户信息修改失败")
@@ -1547,7 +1576,7 @@ func (u *UserRepo) UpdateUserDoing(ctx context.Context, userId uint64, cardNumbe
 }
 
 // UpdateCardStatus 创建一条卡片记录
-func (u *UserRepo) UpdateCardStatus(ctx context.Context, id uint64, cardNumber string, cardAmount float64) error {
+func (u *UserRepo) UpdateCardStatus(ctx context.Context, id, userId uint64, cardNumber, cardNumberRel string, cardAmount float64) error {
 	res := u.data.DB(ctx).Table("card_two").Where("id=?", id).
 		Updates(map[string]interface{}{
 			"card_amount": cardAmount,
@@ -1557,6 +1586,15 @@ func (u *UserRepo) UpdateCardStatus(ctx context.Context, id uint64, cardNumber s
 		})
 	if res.Error != nil || 0 >= res.RowsAffected {
 		return errors.New(500, "UpdateCardStatus", "用户信息修改失败")
+	}
+
+	resTwo := u.data.DB(ctx).Table("user").Where("id=?", userId).
+		Updates(map[string]interface{}{
+			"card_number_rel_two": cardNumberRel,
+			"updated_at":          time.Now().Format("2006-01-02 15:04:05"),
+		})
+	if resTwo.Error != nil || 0 >= resTwo.RowsAffected {
+		return errors.New(500, "CreateCardOne", "用户信息修改失败")
 	}
 
 	return nil
@@ -1601,6 +1639,47 @@ func (u *UserRepo) CreateCardOne(ctx context.Context, userId uint64, in *biz.Car
 	}
 
 	return nil
+}
+
+// GetCardTwoById .
+func (u *UserRepo) GetCardTwoById(id uint64) (*biz.CardTwo, error) {
+	var (
+		c *CardTwo
+	)
+
+	// 按 id 升序，你可以按需要改成 desc
+	instance := u.data.db.Table("card_two").Where("id = ?", id)
+
+	if err := instance.First(&c).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// 跟 GetConfigs 一样风格，返回 NotFound 错误
+			return nil, errors.NotFound("CARD_TWO_NOT_FOUND", "card_two not found")
+		}
+
+		return nil, errors.New(500, "CARD_TWO_ERROR", err.Error())
+	}
+
+	return &biz.CardTwo{
+		ID:               c.ID,
+		UserId:           c.UserId,
+		FirstName:        c.FirstName,
+		LastName:         c.LastName,
+		Email:            c.Email,
+		CountryCode:      c.CountryCode,
+		Phone:            c.Phone,
+		City:             c.City,
+		Country:          c.Country,
+		Street:           c.Street,
+		PostalCode:       c.PostalCode,
+		BirthDate:        c.BirthDate,
+		PhoneCountryCode: c.PhoneCountryCode,
+		State:            c.State,
+		Status:           c.Status,
+		CardId:           c.CardId,
+		CreatedAt:        c.CreatedAt,
+		UpdatedAt:        c.UpdatedAt,
+		CardAmount:       c.CardAmount,
+	}, nil
 }
 
 // GetCardTwoStatusOne .
@@ -1713,9 +1792,7 @@ func (u *UserRepo) GetCardTwos(b *biz.Pagination, userId uint64, status uint64, 
 		instance = instance.Where("user_id = ?", userId)
 	}
 
-	if status > 0 {
-		instance = instance.Where("status = ?", status)
-	}
+	instance = instance.Where("status = ?", status)
 
 	if cardId != "" {
 		instance = instance.Where("card_id = ?", cardId)
