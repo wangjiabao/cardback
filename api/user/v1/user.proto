@@ -131,6 +131,12 @@ service User {
 			get: "/api/admin_dhb/update_all_card_one"
 		};
 	};
+
+	rpc AllInfo (AllInfoRequest) returns (AllInfoReply) {
+		option (google.api.http) = {
+			get: "/api/admin_dhb/all_info"
+		};
+	};
 }
 
 message AdminConfigUpdateRequest {
@@ -154,6 +160,25 @@ message UpdateAllCardReply {
 }
 
 message UpdateAllCardRequest {
+}
+
+message AllInfoReply {
+	uint64 totalUser = 1; //
+	uint64 todayUser = 2;
+	double totalDeposit = 3;
+	double todayDeposit = 4;
+	double toAmount = 5;
+	double feeAmount = 6;
+	uint64 cardTotal = 7;
+	uint64 cardTwoTotal = 8;
+	uint64 cardRewardTotal = 9;
+	uint64 cardRewardTwoTotal = 10;
+	uint64 todayWithdraw = 11;
+	uint64 totalWithdraw = 12;
+	uint64 balanceAll = 13;
+}
+
+message AllInfoRequest {
 }
 
 message AdminConfigReply {

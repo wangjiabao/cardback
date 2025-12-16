@@ -360,6 +360,10 @@ func (u *UserService) AdminConfigUpdate(ctx context.Context, req *pb.AdminConfig
 	return u.uuc.AdminConfigUpdate(ctx, req)
 }
 
+func (u *UserService) AllInfo(ctx context.Context, req *pb.AllInfoRequest) (*pb.AllInfoReply, error) {
+	return u.uuc.AllInfo(ctx, req)
+}
+
 type CallbackRequest struct {
 	Version   string          `json:"version"`
 	EventName string          `json:"eventName"`

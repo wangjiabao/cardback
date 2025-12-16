@@ -6,9 +6,12 @@ import (
 	"cardbinance/internal/pkg/middleware/auth"
 	"context"
 	"crypto/md5"
+	"crypto/tls"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/emersion/go-imap"
+	"github.com/emersion/go-imap/client"
 	"github.com/go-kratos/kratos/v2/log"
 	transporthttp "github.com/go-kratos/kratos/v2/transport/http"
 	jwt2 "github.com/golang-jwt/jwt/v5"
@@ -17,6 +20,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/url"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -882,6 +886,24 @@ func (uuc *UserUseCase) backCard(ctx context.Context, userId uint64, amount floa
 	}
 
 	return nil
+}
+
+func (uuc *UserUseCase) AllInfo(ctx context.Context, req *pb.AllInfoRequest) (*pb.AllInfoReply, error) {
+	return &pb.AllInfoReply{
+		TotalUser:          0,
+		TodayUser:          0,
+		TotalDeposit:       0,
+		TodayDeposit:       0,
+		ToAmount:           0,
+		FeeAmount:          0,
+		CardTotal:          0,
+		CardTwoTotal:       0,
+		CardRewardTotal:    0,
+		CardRewardTwoTotal: 0,
+		TodayWithdraw:      0,
+		TotalWithdraw:      0,
+		BalanceAll:         0,
+	}, nil
 }
 
 func (uuc *UserUseCase) GetWithdrawPassOrRewardedFirst(ctx context.Context) (*Withdraw, error) {
@@ -3217,4 +3239,269 @@ func InterlaceCardTransferOut(ctx context.Context, in *InterlaceCardTransferOutR
 	}
 
 	return &outer.Data, nil
+}
+
+/*************** 解析部分：卡号 + OTP + TTL + 时间 ***************/
+
+type BindOtpMail struct {
+	CardMasked string
+	CardDigits string
+	CardLast4  string
+	OTP        string
+	TTLMinutes int
+	MailTime   *time.Time
+}
+
+var (
+	reOTPNear = regexp.MustCompile(`(?i)(验证码|otp|verification\s*code)[^0-9]{0,40}(\d{6})`)
+	reOTPAny  = regexp.MustCompile(`\b(\d{6})\b`)
+
+	reCardMasked = regexp.MustCompile(`(?i)卡\s*([0-9]{6,12}[xX]{2,12}[0-9]{2,6})`)
+	reCardDigits = regexp.MustCompile(`(?i)卡(?:号)?\s*([0-9]{12,19})`)
+
+	reLast4  = regexp.MustCompile(`([0-9]{4})\b`)
+	reTTLMin = regexp.MustCompile(`有效期[^0-9]{0,10}(\d{1,3})\s*分钟`)
+	reTime   = regexp.MustCompile(`\b(20\d{2}-\d{2}-\d{2}\s+\d{2}:\d{2})\b`)
+)
+
+func ParseBindOtpMail(subject, body string) BindOtpMail {
+	raw := compactSpaces(subject + "\n" + body)
+	out := BindOtpMail{}
+
+	// 卡号（masked 优先）
+	if m := reCardMasked.FindStringSubmatch(raw); len(m) >= 2 {
+		out.CardMasked = m[1]
+		out.CardLast4 = extractLast4(out.CardMasked)
+	} else if m := reCardDigits.FindStringSubmatch(raw); len(m) >= 2 {
+		out.CardDigits = m[1]
+		out.CardLast4 = extractLast4(out.CardDigits)
+	}
+
+	// OTP（关键词附近优先）
+	if m := reOTPNear.FindStringSubmatch(raw); len(m) >= 3 {
+		out.OTP = m[2]
+	} else {
+		out.OTP = findAnyOTPExcludingCard(raw, out.CardMasked, out.CardDigits)
+	}
+
+	// TTL
+	if m := reTTLMin.FindStringSubmatch(raw); len(m) >= 2 {
+		out.TTLMinutes = atoiSafe(m[1])
+	}
+
+	// 时间
+	if tm := parseMailTime(raw); tm != nil {
+		out.MailTime = tm
+	}
+
+	return out
+}
+
+func findAnyOTPExcludingCard(raw, cardMasked, cardDigits string) string {
+	matches := reOTPAny.FindAllStringSubmatch(raw, -1)
+	for _, mm := range matches {
+		if len(mm) < 2 {
+			continue
+		}
+		code := mm[1]
+
+		if cardMasked != "" && strings.Contains(strings.ToLower(cardMasked), strings.ToLower(code)) {
+			continue
+		}
+		if cardDigits != "" && strings.Contains(cardDigits, code) {
+			continue
+		}
+
+		last4 := extractLast4(cardMasked)
+		if last4 == "" {
+			last4 = extractLast4(cardDigits)
+		}
+		if last4 != "" && len(code) == 6 && code[2:] == last4 {
+			continue
+		}
+
+		return code
+	}
+	return ""
+}
+
+func parseMailTime(raw string) *time.Time {
+	m := reTime.FindStringSubmatch(raw)
+	if len(m) < 2 {
+		return nil
+	}
+	tm, err := time.ParseInLocation("2006-01-02 15:04", m[1], time.Local)
+	if err != nil {
+		return nil
+	}
+	return &tm
+}
+
+func extractLast4(s string) string {
+	if s == "" {
+		return ""
+	}
+	m := reLast4.FindStringSubmatch(s)
+	if len(m) >= 2 {
+		return m[1]
+	}
+	d := onlyDigits(s)
+	if len(d) >= 4 {
+		return d[len(d)-4:]
+	}
+	return ""
+}
+
+func compactSpaces(s string) string {
+	s = strings.ReplaceAll(s, "\r\n", " ")
+	s = strings.ReplaceAll(s, "\n", " ")
+	s = strings.ReplaceAll(s, "\t", " ")
+	for strings.Contains(s, "  ") {
+		s = strings.ReplaceAll(s, "  ", " ")
+	}
+	return strings.TrimSpace(s)
+}
+
+func onlyDigits(s string) string {
+	var b strings.Builder
+	b.Grow(len(s))
+	for _, r := range s {
+		if r >= '0' && r <= '9' {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
+func atoiSafe(s string) int {
+	n := 0
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			break
+		}
+		n = n*10 + int(r-'0')
+	}
+	return n
+}
+
+/*************** IMAP 同步增量拉取部分（无 goroutine） ***************/
+
+type NewMailParsed struct {
+	UID          uint32
+	Subject      string
+	From         string
+	InternalDate time.Time
+	Parsed       BindOtpMail
+}
+
+// FetchNewBindOtpMailsSync：同步调用一次就返回“增量”
+// - lastUID：上次处理到的 UID（首次传 0）
+// - limit：本次最多取多少封新增（建议 20~100）
+// 返回：newLastUID（用于你存起来） + 新邮件解析结果
+func FetchNewBindOtpMailsSync(ctx context.Context, imapAddr, email, authCode string, lastUID uint32, limit int) (uint32, []NewMailParsed, error) {
+	if imapAddr == "" {
+		imapAddr = "imap.163.com:993"
+	}
+	if limit <= 0 {
+		limit = 20
+	}
+
+	// 1) connect
+	c, err := client.DialTLS(imapAddr, &tls.Config{ServerName: "imap.163.com"})
+	if err != nil {
+		return lastUID, nil, fmt.Errorf("dial: %w", err)
+	}
+	defer func() { _ = c.Logout() }()
+
+	// 2) login
+	if err := c.Login(email, authCode); err != nil {
+		return lastUID, nil, fmt.Errorf("login: %w", err)
+	}
+
+	// 3) select inbox
+	if _, err := c.Select("INBOX", true); err != nil {
+		return lastUID, nil, fmt.Errorf("select inbox: %w", err)
+	}
+
+	// 4) UID 增量：UID (lastUID+1):*
+	criteria := imap.NewSearchCriteria()
+	criteria.Uid = new(imap.SeqSet)
+	criteria.Uid.AddRange(lastUID+1, 0) // 0 => "*"
+
+	uids, err := c.UidSearch(criteria)
+	if err != nil {
+		return lastUID, nil, fmt.Errorf("uid search: %w", err)
+	}
+	if len(uids) == 0 {
+		return lastUID, nil, nil
+	}
+
+	// 排序 + 截断
+	sort.Slice(uids, func(i, j int) bool { return uids[i] < uids[j] })
+	if len(uids) > limit {
+		uids = uids[len(uids)-limit:]
+	}
+
+	uidset := new(imap.SeqSet)
+	for _, u := range uids {
+		uidset.AddNum(u)
+	}
+
+	// 5) fetch（同步读 channel）
+	section := &imap.BodySectionName{}
+	fetchItems := []imap.FetchItem{
+		imap.FetchUid,
+		imap.FetchEnvelope,
+		imap.FetchInternalDate,
+		section.FetchItem(),
+	}
+
+	msgCh := make(chan *imap.Message, len(uids))
+	if err := c.UidFetch(uidset, fetchItems, msgCh); err != nil {
+		return lastUID, nil, fmt.Errorf("uid fetch: %w", err)
+	}
+	close(msgCh)
+
+	maxUID := lastUID
+	out := make([]NewMailParsed, 0, len(uids))
+
+	for msg := range msgCh {
+		if msg == nil {
+			continue
+		}
+		if msg.Uid > maxUID {
+			maxUID = msg.Uid
+		}
+
+		subject := ""
+		from := ""
+		if msg.Envelope != nil {
+			subject = msg.Envelope.Subject
+			if len(msg.Envelope.From) > 0 && msg.Envelope.From[0] != nil {
+				mb := msg.Envelope.From[0].MailboxName
+				hs := msg.Envelope.From[0].HostName
+				if mb != "" && hs != "" {
+					from = mb + "@" + hs
+				}
+			}
+		}
+
+		body := ""
+		if r := msg.GetBody(section); r != nil {
+			b, _ := io.ReadAll(r)
+			body = string(b)
+		}
+
+		parsed := ParseBindOtpMail(subject, body)
+
+		out = append(out, NewMailParsed{
+			UID:          msg.Uid,
+			Subject:      subject,
+			From:         from,
+			InternalDate: msg.InternalDate,
+			Parsed:       parsed,
+		})
+	}
+
+	return maxUID, out, nil
 }

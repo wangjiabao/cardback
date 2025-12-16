@@ -54,6 +54,24 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /api/admin_dhb/all_info:
+        get:
+            tags:
+                - User
+            operationId: User_AllInfo
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/AllInfoReply'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /api/admin_dhb/card_status_handle:
         get:
             tags:
@@ -674,6 +692,39 @@ components:
         AdminWithdrawEthReply:
             type: object
             properties: {}
+        AllInfoReply:
+            type: object
+            properties:
+                totalUser:
+                    type: string
+                todayUser:
+                    type: string
+                totalDeposit:
+                    type: number
+                    format: double
+                todayDeposit:
+                    type: number
+                    format: double
+                toAmount:
+                    type: number
+                    format: double
+                feeAmount:
+                    type: number
+                    format: double
+                cardTotal:
+                    type: string
+                cardTwoTotal:
+                    type: string
+                cardRewardTotal:
+                    type: string
+                cardRewardTwoTotal:
+                    type: string
+                todayWithdraw:
+                    type: string
+                totalWithdraw:
+                    type: string
+                balanceAll:
+                    type: string
         CardStatusHandleReply:
             type: object
             properties:

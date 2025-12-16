@@ -28,6 +28,7 @@ const OperationUserAdminUserBind = "/api.user.v1.User/AdminUserBind"
 const OperationUserAdminUserBindTwo = "/api.user.v1.User/AdminUserBindTwo"
 const OperationUserAdminUserList = "/api.user.v1.User/AdminUserList"
 const OperationUserAdminWithdrawEth = "/api.user.v1.User/AdminWithdrawEth"
+const OperationUserAllInfo = "/api.user.v1.User/AllInfo"
 const OperationUserCardStatusHandle = "/api.user.v1.User/CardStatusHandle"
 const OperationUserDeposit = "/api.user.v1.User/Deposit"
 const OperationUserOpenCardHandle = "/api.user.v1.User/OpenCardHandle"
@@ -49,6 +50,7 @@ type UserHTTPServer interface {
 	AdminUserBindTwo(context.Context, *AdminUserBindTwoRequest) (*AdminUserBindTwoReply, error)
 	AdminUserList(context.Context, *AdminUserListRequest) (*AdminUserListReply, error)
 	AdminWithdrawEth(context.Context, *AdminWithdrawEthRequest) (*AdminWithdrawEthReply, error)
+	AllInfo(context.Context, *AllInfoRequest) (*AllInfoReply, error)
 	CardStatusHandle(context.Context, *CardStatusHandleRequest) (*CardStatusHandleReply, error)
 	Deposit(context.Context, *DepositRequest) (*DepositReply, error)
 	// OpenCardHandle 开卡
@@ -83,6 +85,7 @@ func RegisterUserHTTPServer(s *http.Server, srv UserHTTPServer) {
 	r.POST("/api/admin_dhb/config_update", _User_AdminConfigUpdate0_HTTP_Handler(srv))
 	r.GET("/api/admin_dhb/update_all_card", _User_UpdateAllCard0_HTTP_Handler(srv))
 	r.GET("/api/admin_dhb/update_all_card_one", _User_UpdateAllCardOne0_HTTP_Handler(srv))
+	r.GET("/api/admin_dhb/all_info", _User_AllInfo0_HTTP_Handler(srv))
 }
 
 func _User_OpenCardHandle0_HTTP_Handler(srv UserHTTPServer) func(ctx http.Context) error {
@@ -470,6 +473,25 @@ func _User_UpdateAllCardOne0_HTTP_Handler(srv UserHTTPServer) func(ctx http.Cont
 	}
 }
 
+func _User_AllInfo0_HTTP_Handler(srv UserHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in AllInfoRequest
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationUserAllInfo)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.AllInfo(ctx, req.(*AllInfoRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*AllInfoReply)
+		return ctx.Result(200, reply)
+	}
+}
+
 type UserHTTPClient interface {
 	AdminCardTwoList(ctx context.Context, req *AdminCardTwoRequest, opts ...http.CallOption) (rsp *AdminCardTwoReply, err error)
 	AdminConfig(ctx context.Context, req *AdminConfigRequest, opts ...http.CallOption) (rsp *AdminConfigReply, err error)
@@ -480,6 +502,7 @@ type UserHTTPClient interface {
 	AdminUserBindTwo(ctx context.Context, req *AdminUserBindTwoRequest, opts ...http.CallOption) (rsp *AdminUserBindTwoReply, err error)
 	AdminUserList(ctx context.Context, req *AdminUserListRequest, opts ...http.CallOption) (rsp *AdminUserListReply, err error)
 	AdminWithdrawEth(ctx context.Context, req *AdminWithdrawEthRequest, opts ...http.CallOption) (rsp *AdminWithdrawEthReply, err error)
+	AllInfo(ctx context.Context, req *AllInfoRequest, opts ...http.CallOption) (rsp *AllInfoReply, err error)
 	CardStatusHandle(ctx context.Context, req *CardStatusHandleRequest, opts ...http.CallOption) (rsp *CardStatusHandleReply, err error)
 	Deposit(ctx context.Context, req *DepositRequest, opts ...http.CallOption) (rsp *DepositReply, err error)
 	OpenCardHandle(ctx context.Context, req *OpenCardHandleRequest, opts ...http.CallOption) (rsp *OpenCardHandleReply, err error)
@@ -609,6 +632,19 @@ func (c *UserHTTPClientImpl) AdminWithdrawEth(ctx context.Context, in *AdminWith
 	pattern := "/api/admin_dhb/withdraw_eth"
 	path := binding.EncodeURL(pattern, in, true)
 	opts = append(opts, http.Operation(OperationUserAdminWithdrawEth))
+	opts = append(opts, http.PathTemplate(pattern))
+	err := c.cc.Invoke(ctx, "GET", path, nil, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, err
+}
+
+func (c *UserHTTPClientImpl) AllInfo(ctx context.Context, in *AllInfoRequest, opts ...http.CallOption) (*AllInfoReply, error) {
+	var out AllInfoReply
+	pattern := "/api/admin_dhb/all_info"
+	path := binding.EncodeURL(pattern, in, true)
+	opts = append(opts, http.Operation(OperationUserAllInfo))
 	opts = append(opts, http.PathTemplate(pattern))
 	err := c.cc.Invoke(ctx, "GET", path, nil, &out, opts...)
 	if err != nil {
