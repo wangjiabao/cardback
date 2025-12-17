@@ -1170,6 +1170,14 @@ func (uuc *UserUseCase) AdminUserBind(ctx context.Context, req *pb.AdminUserBind
 		return &pb.AdminUserBindReply{}, err
 	}
 
+	if 0 >= len(req.SendBody.CardId) {
+		return &pb.AdminUserBindReply{}, err
+	}
+
+	if 0 >= len(req.SendBody.CarNum) {
+		return &pb.AdminUserBindReply{}, err
+	}
+
 	if errThree := uuc.repo.UpdateUserDoing(ctx, user.ID, req.SendBody.CardId, req.SendBody.CarNum, req.SendBody.Amount); errThree != nil {
 		fmt.Println("AdminUserBind", "err =", err)
 		// 这条失败就算了，不影响其它
@@ -1187,6 +1195,14 @@ func (uuc *UserUseCase) AdminUserBindTwo(ctx context.Context, req *pb.AdminUserB
 	cardTwo, err = uuc.repo.GetCardTwoById(req.SendBody.Id)
 	if nil != err || nil == cardTwo {
 		return nil, err
+	}
+
+	if 0 >= len(req.SendBody.CardId) {
+		return &pb.AdminUserBindTwoReply{}, err
+	}
+
+	if 0 >= len(req.SendBody.CarNum) {
+		return &pb.AdminUserBindTwoReply{}, err
 	}
 
 	if errThree := uuc.repo.UpdateCardStatus(ctx, req.SendBody.Id, cardTwo.UserId, req.SendBody.CardId, req.SendBody.CarNum, req.SendBody.Amount); errThree != nil {
