@@ -31,6 +31,7 @@ const OperationUserAdminWithdrawEth = "/api.user.v1.User/AdminWithdrawEth"
 const OperationUserAllInfo = "/api.user.v1.User/AllInfo"
 const OperationUserCardStatusHandle = "/api.user.v1.User/CardStatusHandle"
 const OperationUserDeposit = "/api.user.v1.User/Deposit"
+const OperationUserEmailGet = "/api.user.v1.User/EmailGet"
 const OperationUserOpenCardHandle = "/api.user.v1.User/OpenCardHandle"
 const OperationUserRewardCardTwo = "/api.user.v1.User/RewardCardTwo"
 const OperationUserSetUserCount = "/api.user.v1.User/SetUserCount"
@@ -53,6 +54,7 @@ type UserHTTPServer interface {
 	AllInfo(context.Context, *AllInfoRequest) (*AllInfoReply, error)
 	CardStatusHandle(context.Context, *CardStatusHandleRequest) (*CardStatusHandleReply, error)
 	Deposit(context.Context, *DepositRequest) (*DepositReply, error)
+	EmailGet(context.Context, *EmailGetRequest) (*EmailGetReply, error)
 	// OpenCardHandle 开卡
 	OpenCardHandle(context.Context, *OpenCardHandleRequest) (*OpenCardHandleReply, error)
 	RewardCardTwo(context.Context, *RewardCardTwoRequest) (*RewardCardTwoReply, error)
@@ -86,6 +88,7 @@ func RegisterUserHTTPServer(s *http.Server, srv UserHTTPServer) {
 	r.GET("/api/admin_dhb/update_all_card", _User_UpdateAllCard0_HTTP_Handler(srv))
 	r.GET("/api/admin_dhb/update_all_card_one", _User_UpdateAllCardOne0_HTTP_Handler(srv))
 	r.GET("/api/admin_dhb/all_info", _User_AllInfo0_HTTP_Handler(srv))
+	r.GET("/api/admin_dhb/email_get", _User_EmailGet0_HTTP_Handler(srv))
 }
 
 func _User_OpenCardHandle0_HTTP_Handler(srv UserHTTPServer) func(ctx http.Context) error {
@@ -492,6 +495,25 @@ func _User_AllInfo0_HTTP_Handler(srv UserHTTPServer) func(ctx http.Context) erro
 	}
 }
 
+func _User_EmailGet0_HTTP_Handler(srv UserHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in EmailGetRequest
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationUserEmailGet)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.EmailGet(ctx, req.(*EmailGetRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*EmailGetReply)
+		return ctx.Result(200, reply)
+	}
+}
+
 type UserHTTPClient interface {
 	AdminCardTwoList(ctx context.Context, req *AdminCardTwoRequest, opts ...http.CallOption) (rsp *AdminCardTwoReply, err error)
 	AdminConfig(ctx context.Context, req *AdminConfigRequest, opts ...http.CallOption) (rsp *AdminConfigReply, err error)
@@ -505,6 +527,7 @@ type UserHTTPClient interface {
 	AllInfo(ctx context.Context, req *AllInfoRequest, opts ...http.CallOption) (rsp *AllInfoReply, err error)
 	CardStatusHandle(ctx context.Context, req *CardStatusHandleRequest, opts ...http.CallOption) (rsp *CardStatusHandleReply, err error)
 	Deposit(ctx context.Context, req *DepositRequest, opts ...http.CallOption) (rsp *DepositReply, err error)
+	EmailGet(ctx context.Context, req *EmailGetRequest, opts ...http.CallOption) (rsp *EmailGetReply, err error)
 	OpenCardHandle(ctx context.Context, req *OpenCardHandleRequest, opts ...http.CallOption) (rsp *OpenCardHandleReply, err error)
 	RewardCardTwo(ctx context.Context, req *RewardCardTwoRequest, opts ...http.CallOption) (rsp *RewardCardTwoReply, err error)
 	SetUserCount(ctx context.Context, req *SetUserCountRequest, opts ...http.CallOption) (rsp *SetUserCountReply, err error)
@@ -671,6 +694,19 @@ func (c *UserHTTPClientImpl) Deposit(ctx context.Context, in *DepositRequest, op
 	pattern := "/api/admin_dhb/deposit"
 	path := binding.EncodeURL(pattern, in, true)
 	opts = append(opts, http.Operation(OperationUserDeposit))
+	opts = append(opts, http.PathTemplate(pattern))
+	err := c.cc.Invoke(ctx, "GET", path, nil, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, err
+}
+
+func (c *UserHTTPClientImpl) EmailGet(ctx context.Context, in *EmailGetRequest, opts ...http.CallOption) (*EmailGetReply, error) {
+	var out EmailGetReply
+	pattern := "/api/admin_dhb/email_get"
+	path := binding.EncodeURL(pattern, in, true)
+	opts = append(opts, http.Operation(OperationUserEmailGet))
 	opts = append(opts, http.PathTemplate(pattern))
 	err := c.cc.Invoke(ctx, "GET", path, nil, &out, opts...)
 	if err != nil {

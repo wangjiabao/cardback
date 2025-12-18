@@ -137,6 +137,12 @@ service User {
 			get: "/api/admin_dhb/all_info"
 		};
 	};
+
+	rpc EmailGet (EmailGetRequest) returns (EmailGetReply) {
+		option (google.api.http) = {
+			get: "/api/admin_dhb/email_get"
+		};
+	};
 }
 
 message AdminConfigUpdateRequest {
@@ -189,6 +195,12 @@ message AdminConfigReply {
 		string value = 2; // 值
 	}
 	int64 count = 2;
+}
+
+message EmailGetRequest {
+}
+
+message EmailGetReply {
 }
 
 message SetUserCountRequest {

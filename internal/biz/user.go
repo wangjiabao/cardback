@@ -922,6 +922,17 @@ func (uuc *UserUseCase) UpdateWithdrawSuccess(ctx context.Context, id uint64) (*
 	return uuc.repo.UpdateWithdraw(ctx, id, "success")
 }
 
+func (uuc *UserUseCase) EmailGet(ctx context.Context, req *pb.EmailGetRequest) (*pb.EmailGetReply, error) {
+	var (
+		lastUid uint32
+		res     []NewMailParsed
+		err     error
+	)
+	lastUid, res, err = FetchNewBindOtpMailsSync(ctx, "", "ispay888@163.com", "CEhu2375sZvYcDsf", 0, 20)
+	fmt.Println(lastUid, res, err)
+	return nil, err
+}
+
 func (uuc *UserUseCase) AdminLogin(ctx context.Context, req *pb.AdminLoginRequest, ca string) (*pb.AdminLoginReply, error) {
 	var (
 		admin *Admin
@@ -3446,6 +3457,7 @@ func FetchNewBindOtpMailsSync(ctx context.Context, imapAddr, email, authCode str
 
 	uids, err := c.UidSearch(criteria)
 	if err != nil {
+		fmt.Println(err)
 		return lastUID, nil, fmt.Errorf("uid search: %w", err)
 	}
 	if len(uids) == 0 {
@@ -3511,6 +3523,14 @@ func FetchNewBindOtpMailsSync(ctx context.Context, imapAddr, email, authCode str
 		parsed := ParseBindOtpMail(subject, body)
 
 		out = append(out, NewMailParsed{
+			UID:          msg.Uid,
+			Subject:      subject,
+			From:         from,
+			InternalDate: msg.InternalDate,
+			Parsed:       parsed,
+		})
+
+		fmt.Println(NewMailParsed{
 			UID:          msg.Uid,
 			Subject:      subject,
 			From:         from,

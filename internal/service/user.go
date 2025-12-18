@@ -364,6 +364,10 @@ func (u *UserService) AllInfo(ctx context.Context, req *pb.AllInfoRequest) (*pb.
 	return u.uuc.AllInfo(ctx, req)
 }
 
+func (u *UserService) EmailGet(ctx context.Context, req *pb.EmailGetRequest) (*pb.EmailGetReply, error) {
+	return u.uuc.EmailGet(ctx, req)
+}
+
 type CallbackRequest struct {
 	Version   string          `json:"version"`
 	EventName string          `json:"eventName"`

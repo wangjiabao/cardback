@@ -39,6 +39,7 @@ const (
 	User_UpdateAllCard_FullMethodName     = "/api.user.v1.User/UpdateAllCard"
 	User_UpdateAllCardOne_FullMethodName  = "/api.user.v1.User/UpdateAllCardOne"
 	User_AllInfo_FullMethodName           = "/api.user.v1.User/AllInfo"
+	User_EmailGet_FullMethodName          = "/api.user.v1.User/EmailGet"
 )
 
 // UserClient is the client API for User service.
@@ -66,6 +67,7 @@ type UserClient interface {
 	UpdateAllCard(ctx context.Context, in *UpdateAllCardRequest, opts ...grpc.CallOption) (*UpdateAllCardReply, error)
 	UpdateAllCardOne(ctx context.Context, in *UpdateAllCardRequest, opts ...grpc.CallOption) (*UpdateAllCardReply, error)
 	AllInfo(ctx context.Context, in *AllInfoRequest, opts ...grpc.CallOption) (*AllInfoReply, error)
+	EmailGet(ctx context.Context, in *EmailGetRequest, opts ...grpc.CallOption) (*EmailGetReply, error)
 }
 
 type userClient struct {
@@ -256,6 +258,15 @@ func (c *userClient) AllInfo(ctx context.Context, in *AllInfoRequest, opts ...gr
 	return out, nil
 }
 
+func (c *userClient) EmailGet(ctx context.Context, in *EmailGetRequest, opts ...grpc.CallOption) (*EmailGetReply, error) {
+	out := new(EmailGetReply)
+	err := c.cc.Invoke(ctx, User_EmailGet_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // UserServer is the server API for User service.
 // All implementations must embed UnimplementedUserServer
 // for forward compatibility
@@ -281,6 +292,7 @@ type UserServer interface {
 	UpdateAllCard(context.Context, *UpdateAllCardRequest) (*UpdateAllCardReply, error)
 	UpdateAllCardOne(context.Context, *UpdateAllCardRequest) (*UpdateAllCardReply, error)
 	AllInfo(context.Context, *AllInfoRequest) (*AllInfoReply, error)
+	EmailGet(context.Context, *EmailGetRequest) (*EmailGetReply, error)
 	mustEmbedUnimplementedUserServer()
 }
 
@@ -347,6 +359,9 @@ func (UnimplementedUserServer) UpdateAllCardOne(context.Context, *UpdateAllCardR
 }
 func (UnimplementedUserServer) AllInfo(context.Context, *AllInfoRequest) (*AllInfoReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AllInfo not implemented")
+}
+func (UnimplementedUserServer) EmailGet(context.Context, *EmailGetRequest) (*EmailGetReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method EmailGet not implemented")
 }
 func (UnimplementedUserServer) mustEmbedUnimplementedUserServer() {}
 
@@ -721,6 +736,24 @@ func _User_AllInfo_Handler(srv interface{}, ctx context.Context, dec func(interf
 	return interceptor(ctx, in, info, handler)
 }
 
+func _User_EmailGet_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EmailGetRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServer).EmailGet(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: User_EmailGet_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServer).EmailGet(ctx, req.(*EmailGetRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // User_ServiceDesc is the grpc.ServiceDesc for User service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -807,6 +840,10 @@ var User_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "AllInfo",
 			Handler:    _User_AllInfo_Handler,
+		},
+		{
+			MethodName: "EmailGet",
+			Handler:    _User_EmailGet_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
