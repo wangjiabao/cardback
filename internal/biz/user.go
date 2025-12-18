@@ -10,16 +10,21 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"github.com/emersion/go-imap"
+	imapid "github.com/ProtonMail/go-imap-id"
+	imap "github.com/emersion/go-imap"
 	"github.com/emersion/go-imap/client"
+	"github.com/emersion/go-message/mail"
 	"github.com/go-kratos/kratos/v2/log"
 	transporthttp "github.com/go-kratos/kratos/v2/transport/http"
 	jwt2 "github.com/golang-jwt/jwt/v5"
+	"html"
 	"io"
 	"io/ioutil"
 	"mime/multipart"
+	"net"
 	"net/http"
 	"net/url"
+	"reflect"
 	"regexp"
 	"sort"
 	"strconv"
@@ -57,6 +62,16 @@ type CardTwo struct {
 	Gender           string
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
+}
+
+type CardOrder struct {
+	ID        uint64
+	Last      uint64
+	Code      string
+	Card      string
+	Time      *time.Time
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 type User struct {
@@ -232,6 +247,8 @@ type UserRepo interface {
 	UpdateCardStatus(ctx context.Context, id, userId uint64, cardNumber, cardNumberRel string, cardAmount float64) error
 	GetCardTwos(b *Pagination, userId uint64, status uint64, cardId string) ([]*CardTwo, error, int64)
 	GetCardTwoById(id uint64) (*CardTwo, error)
+	GetCardOrder() (*CardOrder, error)
+	CreateCardOrder(ctx context.Context, in *CardOrder) error
 }
 
 type UserUseCase struct {
@@ -924,12 +941,33 @@ func (uuc *UserUseCase) UpdateWithdrawSuccess(ctx context.Context, id uint64) (*
 
 func (uuc *UserUseCase) EmailGet(ctx context.Context, req *pb.EmailGetRequest) (*pb.EmailGetReply, error) {
 	var (
-		lastUid uint32
-		res     []NewMailParsed
-		err     error
+		lastUid  uint32
+		res      []NewMailParsed
+		err      error
+		cardCode *CardOrder
+		last     uint32
 	)
-	lastUid, res, err = FetchNewBindOtpMailsSync(ctx, "", "ispay888@163.com", "CEhu2375sZvYcDsf", 0, 20)
-	fmt.Println(lastUid, res, err)
+	cardCode, err = uuc.repo.GetCardOrder()
+	if err != nil {
+		return nil, err
+	}
+
+	if nil != cardCode {
+		last = uint32(cardCode.Last)
+	}
+
+	lastUid, res, err = FetchNewBindOtpMailsSyncV1(ctx, "", "", last, 20)
+	if err == nil && res != nil {
+		for _, v := range res {
+			_ = uuc.repo.CreateCardOrder(ctx, &CardOrder{
+				Last: uint64(lastUid),
+				Code: v.Parsed.OTP,
+				Card: v.Parsed.CardMasked,
+				Time: v.Parsed.MailTime,
+			})
+		}
+	}
+
 	return nil, err
 }
 
@@ -3268,55 +3306,70 @@ func InterlaceCardTransferOut(ctx context.Context, in *InterlaceCardTransferOutR
 	return &outer.Data, nil
 }
 
-/*************** 解析部分：卡号 + OTP + TTL + 时间 ***************/
+/*************** 解析：卡号 + OTP + TTL + 时间 ***************/
 
 type BindOtpMail struct {
-	CardMasked string
-	CardDigits string
-	CardLast4  string
-	OTP        string
-	TTLMinutes int
-	MailTime   *time.Time
+	CardMasked string     // 例如 49387519xxxxxx0945（保留 x）
+	CardDigits string     // 例如 493875190000000945（如果邮件给的是纯数字）
+	CardLast4  string     // 例如 0945
+	OTP        string     // 6位验证码
+	TTLMinutes int        // 有效期分钟数（解析不到为 0）
+	MailTime   *time.Time // 邮件正文里出现的时间（解析不到为 nil）
 }
 
 var (
+	// OTP：优先找“验证码/OTP/verification code”附近的6位数字
 	reOTPNear = regexp.MustCompile(`(?i)(验证码|otp|verification\s*code)[^0-9]{0,40}(\d{6})`)
-	reOTPAny  = regexp.MustCompile(`\b(\d{6})\b`)
+	// OTP：兜底找任意独立6位数字
+	reOTPAny = regexp.MustCompile(`\b(\d{6})\b`)
 
-	reCardMasked = regexp.MustCompile(`(?i)卡\s*([0-9]{6,12}[xX]{2,12}[0-9]{2,6})`)
-	reCardDigits = regexp.MustCompile(`(?i)卡(?:号)?\s*([0-9]{12,19})`)
+	reCardMasked = regexp.MustCompile(`(?i)(?:your\s+card|card|您的?卡|卡号|卡)\s*[:：]?\s*([0-9]{6,12}[xX\*]{2,12}[0-9]{2,6})`)
+	reCardDigits = regexp.MustCompile(`(?i)(?:your\s+card|card|您的?卡|卡号|卡)\s*[:：]?\s*([0-9]{12,19})`)
 
-	reLast4  = regexp.MustCompile(`([0-9]{4})\b`)
+	// 后四位：用来从卡号里提取最后4位
+	reLast4 = regexp.MustCompile(`([0-9]{4})\b`)
+
+	// 有效期：有效期:7分钟 / 有效期 7 分钟
 	reTTLMin = regexp.MustCompile(`有效期[^0-9]{0,10}(\d{1,3})\s*分钟`)
-	reTime   = regexp.MustCompile(`\b(20\d{2}-\d{2}-\d{2}\s+\d{2}:\d{2})\b`)
+
+	// 邮件正文时间：2025-12-11 15:14
+	reTime = regexp.MustCompile(`\b(20\d{2}-\d{2}-\d{2}\s+\d{2}:\d{2})\b`)
+
+	// --- 轻量 HTML 清洗（Go regexp 不支持 \1 反向引用，所以拆开） ---
+	reStripScript = regexp.MustCompile(`(?is)<script[^>]*>.*?</script>`)
+	reStripStyle  = regexp.MustCompile(`(?is)<style[^>]*>.*?</style>`)
+	reBr          = regexp.MustCompile(`(?is)<br\s*/?>`)
+	rePclose      = regexp.MustCompile(`(?is)</p>`)
+	reTag         = regexp.MustCompile(`(?is)<[^>]+>`)
 )
 
+// ParseBindOtpMail 从 subject+body 中解析：卡号(掩码/纯数字)、后四位、OTP、TTL分钟、正文时间
 func ParseBindOtpMail(subject, body string) BindOtpMail {
 	raw := compactSpaces(subject + "\n" + body)
 	out := BindOtpMail{}
 
-	// 卡号（masked 优先）
+	// 1) 卡号
 	if m := reCardMasked.FindStringSubmatch(raw); len(m) >= 2 {
-		out.CardMasked = m[1]
+		out.CardMasked = normalizeMask(m[1])
 		out.CardLast4 = extractLast4(out.CardMasked)
 	} else if m := reCardDigits.FindStringSubmatch(raw); len(m) >= 2 {
 		out.CardDigits = m[1]
 		out.CardLast4 = extractLast4(out.CardDigits)
 	}
 
-	// OTP（关键词附近优先）
+	// 2) OTP
 	if m := reOTPNear.FindStringSubmatch(raw); len(m) >= 3 {
 		out.OTP = m[2]
 	} else {
 		out.OTP = findAnyOTPExcludingCard(raw, out.CardMasked, out.CardDigits)
 	}
 
-	// TTL
+	// 3) 有效期分钟
 	if m := reTTLMin.FindStringSubmatch(raw); len(m) >= 2 {
 		out.TTLMinutes = atoiSafe(m[1])
 	}
 
-	// 时间
+	// 4) 邮件正文时间
 	if tm := parseMailTime(raw); tm != nil {
 		out.MailTime = tm
 	}
@@ -3324,25 +3377,27 @@ func ParseBindOtpMail(subject, body string) BindOtpMail {
 	return out
 }
 
+// findAnyOTPExcludingCard 从全文找6位数字，并尽量排除卡号片段/后四位相关误判
 func findAnyOTPExcludingCard(raw, cardMasked, cardDigits string) string {
 	matches := reOTPAny.FindAllStringSubmatch(raw, -1)
+
+	last4 := extractLast4(cardMasked)
+	if last4 == "" {
+		last4 = extractLast4(cardDigits)
+	}
+
 	for _, mm := range matches {
 		if len(mm) < 2 {
 			continue
 		}
 		code := mm[1]
 
-		if cardMasked != "" && strings.Contains(strings.ToLower(cardMasked), strings.ToLower(code)) {
-			continue
-		}
+		// 如果 code 是卡号的一部分（纯数字卡号里包含这6位），跳过
 		if cardDigits != "" && strings.Contains(cardDigits, code) {
 			continue
 		}
 
-		last4 := extractLast4(cardMasked)
-		if last4 == "" {
-			last4 = extractLast4(cardDigits)
-		}
+		// 避免把“含后四位的6位”误判为 OTP（例如 XX0945）
 		if last4 != "" && len(code) == 6 && code[2:] == last4 {
 			continue
 		}
@@ -3364,13 +3419,14 @@ func parseMailTime(raw string) *time.Time {
 	return &tm
 }
 
+// extractLast4 取“最后一个”4位数字（避免拿到开头那段 4 位）
 func extractLast4(s string) string {
 	if s == "" {
 		return ""
 	}
-	m := reLast4.FindStringSubmatch(s)
-	if len(m) >= 2 {
-		return m[1]
+	all := reLast4.FindAllStringSubmatch(s, -1)
+	if n := len(all); n > 0 && len(all[n-1]) >= 2 {
+		return all[n-1][1]
 	}
 	d := onlyDigits(s)
 	if len(d) >= 4 {
@@ -3380,6 +3436,21 @@ func extractLast4(s string) string {
 }
 
 func compactSpaces(s string) string {
+	// HTML实体解码（&nbsp; 等）
+	s = html.UnescapeString(s)
+
+	// 轻量去 script/style
+	s = reStripScript.ReplaceAllString(s, " ")
+	s = reStripStyle.ReplaceAllString(s, " ")
+
+	// 处理换行
+	s = reBr.ReplaceAllString(s, "\n")
+	s = rePclose.ReplaceAllString(s, "\n")
+
+	// 去掉所有标签
+	s = reTag.ReplaceAllString(s, " ")
+
+	// 统一空白
 	s = strings.ReplaceAll(s, "\r\n", " ")
 	s = strings.ReplaceAll(s, "\n", " ")
 	s = strings.ReplaceAll(s, "\t", " ")
@@ -3389,9 +3460,21 @@ func compactSpaces(s string) string {
 	return strings.TrimSpace(s)
 }
 
+// normalizeMask 把 X/* 统一成 x，并去空格
+func normalizeMask(card string) string {
+	c := strings.TrimSpace(card)
+	c = strings.ReplaceAll(c, " ", "")
+	c = strings.Map(func(r rune) rune {
+		if r == 'X' || r == '*' {
+			return 'x'
+		}
+		return r
+	}, c)
+	return c
+}
+
 func onlyDigits(s string) string {
 	var b strings.Builder
-	b.Grow(len(s))
 	for _, r := range s {
 		if r >= '0' && r <= '9' {
 			b.WriteRune(r)
@@ -3411,8 +3494,7 @@ func atoiSafe(s string) int {
 	return n
 }
 
-/*************** IMAP 同步增量拉取部分（无 goroutine） ***************/
-
+/*************** 同步增量拉取（无 goroutine） ***************/
 type NewMailParsed struct {
 	UID          uint32
 	Subject      string
@@ -3421,62 +3503,98 @@ type NewMailParsed struct {
 	Parsed       BindOtpMail
 }
 
-// FetchNewBindOtpMailsSync：同步调用一次就返回“增量”
-// - lastUID：上次处理到的 UID（首次传 0）
-// - limit：本次最多取多少封新增（建议 20~100）
-// 返回：newLastUID（用于你存起来） + 新邮件解析结果
-func FetchNewBindOtpMailsSync(ctx context.Context, imapAddr, email, authCode string, lastUID uint32, limit int) (uint32, []NewMailParsed, error) {
-	if imapAddr == "" {
-		imapAddr = "imap.163.com:993"
-	}
+func FetchNewBindOtpMailsSyncV1(ctx context.Context, email, authCode string, lastUID uint32, limit int) (uint32, []NewMailParsed, error) {
+	const (
+		addr       = "imap.163.com:993"
+		serverName = "imap.163.com"
+		mailbox    = "INBOX"
+
+		targetFrom = "noreply@email.interlace.money"
+
+		totalTimeout = 40 * time.Second
+
+		dialTimeout      = 12 * time.Second
+		handshakeTimeout = 12 * time.Second
+
+		// 原始 RFC822 最多读多少（邮件可能带 html + 多 part）
+		maxRawBytes = int64(5 << 20) // 5MB
+	)
+
 	if limit <= 0 {
-		limit = 20
+		limit = 50
 	}
 
-	// 1) connect
-	c, err := client.DialTLS(imapAddr, &tls.Config{ServerName: "imap.163.com"})
+	// ✅ 不用外层 request ctx（它可能很短导致 dial deadline exceeded）
+	runCtx, cancel := context.WithTimeout(context.Background(), totalTimeout)
+	defer cancel()
+
+	// 1) Dial + TLS Handshake（强制 tcp4，避免 IPv6 卡住）
+	c, err := dialIMAPTLS(runCtx, "tcp4", addr, serverName, dialTimeout, handshakeTimeout)
 	if err != nil {
-		return lastUID, nil, fmt.Errorf("dial: %w", err)
+		return lastUID, nil, fmt.Errorf("dial tls: %w", err)
 	}
-	defer func() { _ = c.Logout() }()
+	defer forceCloseIMAP(c)
 
-	// 2) login
-	if err := c.Login(email, authCode); err != nil {
+	// 2) Login
+	if err := runWithCtx(runCtx, c, func() error { return c.Login(email, authCode) }); err != nil {
 		return lastUID, nil, fmt.Errorf("login: %w", err)
 	}
 
-	// 3) select inbox
-	if _, err := c.Select("INBOX", true); err != nil {
-		return lastUID, nil, fmt.Errorf("select inbox: %w", err)
+	// 3) 163 常见需要 IMAP ID（忽略错误）
+	_, _ = imapid.NewClient(c).ID(imapid.ID{
+		"name":    "kratos-card-service",
+		"version": "1.0.0",
+		"vendor":  "your-company",
+	})
+
+	// 4) Select INBOX（只读）
+	if err := runWithCtx(runCtx, c, func() error {
+		_, e := c.Select(mailbox, true)
+		return e
+	}); err != nil {
+		return lastUID, nil, fmt.Errorf("select %s: %w", mailbox, err)
 	}
 
-	// 4) UID 增量：UID (lastUID+1):*
+	// 5) UID 增量搜索：UID (lastUID+1):*
 	criteria := imap.NewSearchCriteria()
 	criteria.Uid = new(imap.SeqSet)
-	criteria.Uid.AddRange(lastUID+1, 0) // 0 => "*"
+	criteria.Uid.AddRange(lastUID+1, 0)
 
-	uids, err := c.UidSearch(criteria)
-	if err != nil {
-		fmt.Println(err)
+	var uidsAll []uint32
+	if err := runWithCtx(runCtx, c, func() error {
+		var e error
+		uidsAll, e = c.UidSearch(criteria)
+		return e
+	}); err != nil {
 		return lastUID, nil, fmt.Errorf("uid search: %w", err)
 	}
-	if len(uids) == 0 {
+	if len(uidsAll) == 0 {
 		return lastUID, nil, nil
 	}
 
-	// 排序 + 截断
-	sort.Slice(uids, func(i, j int) bool { return uids[i] < uids[j] })
-	if len(uids) > limit {
-		uids = uids[len(uids)-limit:]
+	sort.Slice(uidsAll, func(i, j int) bool { return uidsAll[i] < uidsAll[j] })
+
+	// ✅ 关键：本轮最大 UID（不受 fetch 成功与否影响）
+	maxUID := uidsAll[len(uidsAll)-1]
+
+	// ✅ fetch 用窗口（你只追最新，漏本轮无所谓）
+	scanLimit := limit * 10
+	if scanLimit < 200 {
+		scanLimit = 200
+	}
+	if scanLimit > 1000 {
+		scanLimit = 1000
+	}
+	uidsFetch := uidsAll
+	if len(uidsFetch) > scanLimit {
+		uidsFetch = uidsFetch[len(uidsFetch)-scanLimit:]
 	}
 
 	uidset := new(imap.SeqSet)
-	for _, u := range uids {
-		uidset.AddNum(u)
-	}
+	uidset.AddNum(uidsFetch...)
 
-	// 5) fetch（同步读 channel）
-	section := &imap.BodySectionName{}
+	// 用 BODY[] 拿到整封 RFC822，再自己解 MIME
+	section := &imap.BodySectionName{Peek: true}
 	fetchItems := []imap.FetchItem{
 		imap.FetchUid,
 		imap.FetchEnvelope,
@@ -3484,60 +3602,193 @@ func FetchNewBindOtpMailsSync(ctx context.Context, imapAddr, email, authCode str
 		section.FetchItem(),
 	}
 
-	msgCh := make(chan *imap.Message, len(uids))
-	if err := c.UidFetch(uidset, fetchItems, msgCh); err != nil {
-		return lastUID, nil, fmt.Errorf("uid fetch: %w", err)
-	}
-	close(msgCh)
+	// 6) Fetch：done + select，保证不死等
+	msgCh := make(chan *imap.Message, 10)
+	done := make(chan error, 1)
 
-	maxUID := lastUID
-	out := make([]NewMailParsed, 0, len(uids))
+	go func() {
+		done <- c.UidFetch(uidset, fetchItems, msgCh) // 结束会 close(msgCh)
+	}()
 
-	for msg := range msgCh {
-		if msg == nil {
-			continue
-		}
-		if msg.Uid > maxUID {
-			maxUID = msg.Uid
-		}
+	out := make([]NewMailParsed, 0, limit)
+	msgChOpen := true
 
-		subject := ""
-		from := ""
-		if msg.Envelope != nil {
-			subject = msg.Envelope.Subject
-			if len(msg.Envelope.From) > 0 && msg.Envelope.From[0] != nil {
-				mb := msg.Envelope.From[0].MailboxName
-				hs := msg.Envelope.From[0].HostName
-				if mb != "" && hs != "" {
-					from = mb + "@" + hs
+	for msgChOpen {
+		select {
+		case msg, ok := <-msgCh:
+			if !ok {
+				msgChOpen = false
+				continue
+			}
+			if msg == nil {
+				continue
+			}
+
+			subject := ""
+			from := ""
+			if msg.Envelope != nil {
+				subject = msg.Envelope.Subject
+
+				// 取 From（多个 From 时优先匹配目标发件人）
+				for _, a := range msg.Envelope.From {
+					if a == nil {
+						continue
+					}
+					mb := a.MailboxName
+					hs := a.HostName
+					if mb == "" || hs == "" {
+						continue
+					}
+					addr2 := mb + "@" + hs
+					if from == "" {
+						from = addr2
+					}
+					if strings.EqualFold(addr2, targetFrom) {
+						from = addr2
+						break
+					}
 				}
 			}
+
+			// ✅ 只记录目标发件人
+			if !strings.EqualFold(from, targetFrom) {
+				continue
+			}
+
+			// ✅ 关键：拿到原始 RFC822，再解 MIME 得到可读正文
+			bodyText := ""
+			if r := msg.GetBody(section); r != nil {
+				rawRFC822, _ := io.ReadAll(io.LimitReader(r, maxRawBytes))
+				bodyText = ExtractDecodedMailBody(rawRFC822)
+				if bodyText == "" {
+					// fallback：万一不是 MIME 或解析失败
+					bodyText = string(rawRFC822)
+				}
+			}
+
+			parsed := ParseBindOtpMail(subject, bodyText)
+
+			fmt.Println(parsed)
+			if len(out) < limit {
+				out = append(out, NewMailParsed{
+					UID:          msg.Uid,
+					Subject:      subject,
+					From:         from,
+					InternalDate: msg.InternalDate,
+					Parsed:       parsed,
+				})
+			}
+
+		case err := <-done:
+			if err != nil {
+				// ✅ 即使 fetch 失败，也返回 maxUID（本轮最大）
+				return maxUID, out, fmt.Errorf("uid fetch: %w", err)
+			}
+			msgChOpen = false
+
+		case <-runCtx.Done():
+			// ✅ 超时：断开连接打断阻塞；仍返回 maxUID
+			forceCloseIMAP(c)
+			return maxUID, out, runCtx.Err()
 		}
-
-		body := ""
-		if r := msg.GetBody(section); r != nil {
-			b, _ := io.ReadAll(r)
-			body = string(b)
-		}
-
-		parsed := ParseBindOtpMail(subject, body)
-
-		out = append(out, NewMailParsed{
-			UID:          msg.Uid,
-			Subject:      subject,
-			From:         from,
-			InternalDate: msg.InternalDate,
-			Parsed:       parsed,
-		})
-
-		fmt.Println(NewMailParsed{
-			UID:          msg.Uid,
-			Subject:      subject,
-			From:         from,
-			InternalDate: msg.InternalDate,
-			Parsed:       parsed,
-		})
 	}
 
 	return maxUID, out, nil
+}
+
+// ExtractDecodedMailBody：从 RFC822 原始邮件中提取“已解码”的正文
+// 优先 text/plain；没有则用 text/html
+func ExtractDecodedMailBody(rawRFC822 []byte) string {
+	mr, err := mail.CreateReader(bytes.NewReader(rawRFC822))
+	if err != nil {
+		return ""
+	}
+
+	var plain, htmlBody string
+
+	for {
+		p, err := mr.NextPart()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			break
+		}
+
+		ih, ok := p.Header.(*mail.InlineHeader)
+		if !ok {
+			continue
+		}
+
+		ct, _, _ := ih.ContentType()
+		ct = strings.ToLower(ct)
+
+		// 注意：go-message 会帮你按 Content-Transfer-Encoding 解码
+		b, _ := io.ReadAll(p.Body)
+
+		if strings.HasPrefix(ct, "text/plain") && plain == "" {
+			plain = string(b)
+		}
+		if strings.HasPrefix(ct, "text/html") && htmlBody == "" {
+			htmlBody = string(b)
+		}
+	}
+
+	if plain != "" {
+		return plain
+	}
+	if htmlBody != "" {
+		return htmlBody
+	}
+	return ""
+}
+
+// ---- helpers ----
+
+func dialIMAPTLS(ctx context.Context, network, addr, serverName string, dialTimeout, handshakeTimeout time.Duration) (*client.Client, error) {
+	d := &net.Dialer{Timeout: dialTimeout}
+	rawConn, err := d.DialContext(ctx, network, addr)
+	if err != nil {
+		return nil, err
+	}
+
+	tlsConn := tls.Client(rawConn, &tls.Config{
+		ServerName: serverName,
+		MinVersion: tls.VersionTLS12,
+	})
+
+	_ = tlsConn.SetDeadline(time.Now().Add(handshakeTimeout))
+	if err := tlsConn.Handshake(); err != nil {
+		_ = tlsConn.Close()
+		return nil, err
+	}
+	_ = tlsConn.SetDeadline(time.Time{})
+
+	return client.New(tlsConn)
+}
+
+func runWithCtx(ctx context.Context, c *client.Client, fn func() error) error {
+	done := make(chan error, 1)
+	go func() { done <- fn() }()
+	select {
+	case err := <-done:
+		return err
+	case <-ctx.Done():
+		forceCloseIMAP(c)
+		return ctx.Err()
+	}
+}
+
+func forceCloseIMAP(c *client.Client) {
+	if c == nil {
+		return
+	}
+	// 有些版本有 Terminate()，没有就 Logout()
+	v := reflect.ValueOf(c)
+	m := v.MethodByName("Terminate")
+	if m.IsValid() && m.Type().NumIn() == 0 {
+		m.Call(nil)
+		return
+	}
+	_ = c.Logout()
 }

@@ -365,7 +365,25 @@ func (u *UserService) AllInfo(ctx context.Context, req *pb.AllInfoRequest) (*pb.
 }
 
 func (u *UserService) EmailGet(ctx context.Context, req *pb.EmailGetRequest) (*pb.EmailGetReply, error) {
-	return u.uuc.EmailGet(ctx, req)
+	end := time.Now().UTC().Add(50 * time.Second)
+
+	var (
+		err error
+	)
+	for i := 1; i <= 10; i++ {
+		now := time.Now().UTC()
+		if end.Before(now) {
+			break
+		}
+
+		_, err = u.uuc.EmailGet(ctx, req)
+		if nil != err {
+			fmt.Println(err)
+		}
+		time.Sleep(5 * time.Second)
+	}
+
+	return nil, nil
 }
 
 type CallbackRequest struct {

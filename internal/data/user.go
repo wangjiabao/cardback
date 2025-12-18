@@ -146,6 +146,16 @@ type EthUserRecord struct {
 	Last      int64     `gorm:"type:int;not null"`
 }
 
+type CardOrder struct {
+	ID        uint64     `gorm:"primarykey;type:int"`
+	Last      uint64     `gorm:"type:int;not null"`                       // createTime(ms)
+	Code      string     `gorm:"type:varchar(100);not null;default:'no'"` // referenceId
+	Card      string     `gorm:"type:varchar(100);not null;default:'no'"` // referenceId
+	Time      *time.Time `gorm:"type:datetime;not null"`
+	CreatedAt time.Time  `gorm:"type:datetime;not null"`
+	UpdatedAt time.Time  `gorm:"type:datetime;not null"`
+}
+
 type Card struct {
 	ID uint64 `gorm:"primarykey;type:int"`
 
@@ -1680,6 +1690,51 @@ func (u *UserRepo) GetCardTwoById(id uint64) (*biz.CardTwo, error) {
 		UpdatedAt:        c.UpdatedAt,
 		CardAmount:       c.CardAmount,
 	}, nil
+}
+
+// GetCardOrder .
+func (u *UserRepo) GetCardOrder() (*biz.CardOrder, error) {
+	var (
+		c *CardOrder
+	)
+
+	// 按 id 升序，你可以按需要改成 desc
+	instance := u.data.db.Table("card_code").Order("last desc")
+
+	if err := instance.First(&c).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// 跟 GetConfigs 一样风格，返回 NotFound 错误
+			return nil, nil
+		}
+
+		return nil, errors.New(500, "CARD_ORDER_ERROR", err.Error())
+	}
+
+	return &biz.CardOrder{
+		ID:        c.ID,
+		Last:      c.Last,
+		Code:      c.Code,
+		Card:      c.Card,
+		Time:      c.Time,
+		CreatedAt: c.CreatedAt,
+	}, nil
+}
+
+// CreateCardOrder
+func (u *UserRepo) CreateCardOrder(ctx context.Context, in *biz.CardOrder) error {
+	var c CardOrder
+
+	c.Last = in.Last
+	c.Card = in.Card
+	c.Code = in.Code
+	c.Time = in.Time
+
+	resInsert := u.data.DB(ctx).Table("card_code").Create(&c)
+	if resInsert.Error != nil || resInsert.RowsAffected <= 0 {
+		return errors.New(500, "CREATE_CARD_CODE_ERROR", "卡片信息创建失败")
+	}
+
+	return nil
 }
 
 // GetCardTwoStatusOne .
