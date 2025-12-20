@@ -708,10 +708,12 @@ func (uuc *UserUseCase) CardTwoStatusHandle(ctx context.Context) error {
 		vipThreeThree uint64
 		vipThreeTwo   uint64
 		vipThreeOne   uint64
+		vipThreeSix   uint64
+		vipThreeSeven uint64
 	)
 
 	// 配置
-	configs, err = uuc.repo.GetConfigByKeys("new_vip_three_five", "new_vip_three_four", "new_vip_three_one", "new_vip_three_two", "new_vip_three_three")
+	configs, err = uuc.repo.GetConfigByKeys("new_vip_three_seven", "new_vip_three_six", "new_vip_three_five", "new_vip_three_four", "new_vip_three_one", "new_vip_three_two", "new_vip_three_three")
 	if nil != configs {
 		for _, vConfig := range configs {
 			if "new_vip_three_five" == vConfig.KeyName {
@@ -728,6 +730,12 @@ func (uuc *UserUseCase) CardTwoStatusHandle(ctx context.Context) error {
 			}
 			if "new_vip_three_one" == vConfig.KeyName {
 				vipThreeOne, _ = strconv.ParseUint(vConfig.Value, 10, 64)
+			}
+			if "new_vip_three_seven" == vConfig.KeyName {
+				vipThreeSeven, _ = strconv.ParseUint(vConfig.Value, 10, 64)
+			}
+			if "new_vip_three_six" == vConfig.KeyName {
+				vipThreeSix, _ = strconv.ParseUint(vConfig.Value, 10, 64)
 			}
 		}
 	}
@@ -799,7 +807,7 @@ func (uuc *UserUseCase) CardTwoStatusHandle(ctx context.Context) error {
 		lastVip := uint64(0)
 		lastAmount := uint64(0)
 		for i := totalTmp; i >= 0; i-- {
-			if vipThreeFive <= lastAmount {
+			if vipThreeSeven <= lastAmount {
 				break
 			}
 
@@ -866,6 +874,22 @@ func (uuc *UserUseCase) CardTwoStatusHandle(ctx context.Context) error {
 
 				tmpAmount = vipThreeFive - lastAmount
 				lastAmount = vipThreeFive
+			} else if 6 == usersMap[tmpUserId].VipThree {
+				if vipThreeSix <= lastAmount {
+					fmt.Println("开卡2遍历，vip奖励信息设置错误6：", usersMap[tmpUserId], lastVip, vipThreeSix, lastAmount)
+					continue
+				}
+
+				tmpAmount = vipThreeSix - lastAmount
+				lastAmount = vipThreeSix
+			} else if 7 == usersMap[tmpUserId].VipThree {
+				if vipThreeSeven <= lastAmount {
+					fmt.Println("开卡2遍历，vip奖励信息设置错误7：", usersMap[tmpUserId], lastVip, vipThreeSeven, lastAmount)
+					continue
+				}
+
+				tmpAmount = vipThreeSeven - lastAmount
+				lastAmount = vipThreeSeven
 			} else {
 				continue
 			}
