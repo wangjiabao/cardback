@@ -1886,6 +1886,14 @@ func (uuc *UserUseCase) SetVipThree(ctx context.Context, req *pb.SetVipThreeRequ
 		lock = 2
 	} else if 3 == req.SendBody.VipThree {
 		lock = 3
+	} else if 4 == req.SendBody.VipThree {
+		lock = 4
+	} else if 5 == req.SendBody.VipThree {
+		lock = 5
+	} else if 6 == req.SendBody.VipThree {
+		lock = 6
+	} else if 7 == req.SendBody.VipThree {
+		lock = 7
 	} else {
 		lock = 0
 	}
