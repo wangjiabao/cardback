@@ -2345,7 +2345,7 @@ func GetInterlaceAccessToken(ctx context.Context) (string, error) {
 	}
 
 	accessToken, refreshToken, expiresIn, err := interlaceGenerateAccessToken(ctx, code)
-	if err != nil {
+	if 0 >= len(accessToken) || err != nil {
 		return "", fmt.Errorf("generate interlace access token failed: %w", err)
 	}
 
@@ -3184,6 +3184,7 @@ func InterlaceListCards(ctx context.Context, in *InterlaceListCardsReq) ([]*Inte
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		fmt.Println("at", accessToken)
 		return nil, "", fmt.Errorf("interlace list cards http %d: %s", resp.StatusCode, string(body))
 	}
 
