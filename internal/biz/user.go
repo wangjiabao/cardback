@@ -3548,7 +3548,6 @@ func FetchNewBindOtpMailsSyncV1(ctx context.Context, email, authCode string, las
 		dialTimeout      = 12 * time.Second
 		handshakeTimeout = 12 * time.Second
 
-		// 原始 RFC822 最多读多少（邮件可能带 html + 多 part）
 		maxRawBytes = int64(5 << 20) // 5MB
 	)
 
@@ -3565,10 +3564,20 @@ func FetchNewBindOtpMailsSyncV1(ctx context.Context, email, authCode string, las
 	if err != nil {
 		return lastUID, nil, fmt.Errorf("dial tls: %w", err)
 	}
-	defer forceCloseIMAP(c)
+
+	// ✅ 只允许关闭一次，避免重复 close 导致 noisy 的 “use of closed network connection”
+	var once sync.Once
+	closeOnce := func() {
+		once.Do(func() {
+			forceCloseIMAP(c)
+		})
+	}
+	defer closeOnce()
 
 	// 2) Login
-	if err := runWithCtx(runCtx, c, func() error { return c.Login(email, authCode) }); err != nil {
+	if err := runWithCtx(runCtx, closeOnce, func() error {
+		return c.Login(email, authCode)
+	}); err != nil {
 		return lastUID, nil, fmt.Errorf("login: %w", err)
 	}
 
@@ -3580,7 +3589,7 @@ func FetchNewBindOtpMailsSyncV1(ctx context.Context, email, authCode string, las
 	})
 
 	// 4) Select INBOX（只读）
-	if err := runWithCtx(runCtx, c, func() error {
+	if err := runWithCtx(runCtx, closeOnce, func() error {
 		_, e := c.Select(mailbox, true)
 		return e
 	}); err != nil {
@@ -3593,7 +3602,7 @@ func FetchNewBindOtpMailsSyncV1(ctx context.Context, email, authCode string, las
 	criteria.Uid.AddRange(lastUID+1, 0)
 
 	var uidsAll []uint32
-	if err := runWithCtx(runCtx, c, func() error {
+	if err := runWithCtx(runCtx, closeOnce, func() error {
 		var e error
 		uidsAll, e = c.UidSearch(criteria)
 		return e
@@ -3661,7 +3670,6 @@ func FetchNewBindOtpMailsSyncV1(ctx context.Context, email, authCode string, las
 			if msg.Envelope != nil {
 				subject = msg.Envelope.Subject
 
-				// 取 From（多个 From 时优先匹配目标发件人）
 				for _, a := range msg.Envelope.From {
 					if a == nil {
 						continue
@@ -3687,20 +3695,20 @@ func FetchNewBindOtpMailsSyncV1(ctx context.Context, email, authCode string, las
 				continue
 			}
 
-			// ✅ 关键：拿到原始 RFC822，再解 MIME 得到可读正文
 			bodyText := ""
 			if r := msg.GetBody(section); r != nil {
 				rawRFC822, _ := io.ReadAll(io.LimitReader(r, maxRawBytes))
 				bodyText = ExtractDecodedMailBody(rawRFC822)
 				if bodyText == "" {
-					// fallback：万一不是 MIME 或解析失败
 					bodyText = string(rawRFC822)
 				}
 			}
 
 			parsed := ParseBindOtpMail(subject, bodyText)
 
-			fmt.Println(parsed)
+			// 你自己调试打印
+			// fmt.Println(parsed)
+
 			if len(out) < limit {
 				out = append(out, NewMailParsed{
 					UID:          msg.Uid,
@@ -3720,7 +3728,7 @@ func FetchNewBindOtpMailsSyncV1(ctx context.Context, email, authCode string, las
 
 		case <-runCtx.Done():
 			// ✅ 超时：断开连接打断阻塞；仍返回 maxUID
-			forceCloseIMAP(c)
+			closeOnce()
 			return maxUID, out, runCtx.Err()
 		}
 	}
@@ -3755,7 +3763,6 @@ func ExtractDecodedMailBody(rawRFC822 []byte) string {
 		ct, _, _ := ih.ContentType()
 		ct = strings.ToLower(ct)
 
-		// 注意：go-message 会帮你按 Content-Transfer-Encoding 解码
 		b, _ := io.ReadAll(p.Body)
 
 		if strings.HasPrefix(ct, "text/plain") && plain == "" {
@@ -3799,14 +3806,15 @@ func dialIMAPTLS(ctx context.Context, network, addr, serverName string, dialTime
 	return client.New(tlsConn)
 }
 
-func runWithCtx(ctx context.Context, c *client.Client, fn func() error) error {
+// runWithCtx：让 IMAP 命令在 ctx 超时/取消时可被打断（只关闭一次）
+func runWithCtx(ctx context.Context, closeFn func(), fn func() error) error {
 	done := make(chan error, 1)
 	go func() { done <- fn() }()
 	select {
 	case err := <-done:
 		return err
 	case <-ctx.Done():
-		forceCloseIMAP(c)
+		closeFn()
 		return ctx.Err()
 	}
 }
