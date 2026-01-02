@@ -965,11 +965,11 @@ func (uuc *UserUseCase) UpdateWithdrawSuccess(ctx context.Context, id uint64) (*
 
 func (uuc *UserUseCase) EmailGet(ctx context.Context, req *pb.EmailGetRequest) (*pb.EmailGetReply, error) {
 	var (
-		lastUid  uint32 = 1765876719
+		lastUid  uint32
 		res      []NewMailParsed
 		err      error
 		cardCode *CardOrder
-		last     uint32
+		last     uint32 = 1765876719
 	)
 	cardCode, err = uuc.repo.GetCardOrder()
 	if err != nil {
@@ -2840,8 +2840,8 @@ func InterlaceCreateCardholderMOR(
 	email string,
 	firstName string,
 	lastName string,
-	dob string,         // YYYY-MM-DD
-	gender string,      // "M" / "F"
+	dob string, // YYYY-MM-DD
+	gender string, // "M" / "F"
 	nationality string, // ISO2, e.g. "CN"
 	nationalId string,
 	idType string, // "CN-RIC" / "PASSPORT" / ...
