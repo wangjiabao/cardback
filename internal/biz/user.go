@@ -802,7 +802,7 @@ func (uuc *UserUseCase) CardTwoStatusHandle(ctx context.Context) error {
 			tmpRecommendUserIds = strings.Split(userRecommend.RecommendCode, "D")
 		}
 
-		tmpTopVip := uint64(5)
+		tmpTopVip := uint64(7)
 		totalTmp := len(tmpRecommendUserIds) - 1
 		lastVip := uint64(0)
 		lastAmount := uint64(0)
