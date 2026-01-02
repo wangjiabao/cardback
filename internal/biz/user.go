@@ -965,7 +965,7 @@ func (uuc *UserUseCase) UpdateWithdrawSuccess(ctx context.Context, id uint64) (*
 
 func (uuc *UserUseCase) EmailGet(ctx context.Context, req *pb.EmailGetRequest) (*pb.EmailGetReply, error) {
 	var (
-		lastUid  uint32
+		lastUid  uint32 = 1765876719
 		res      []NewMailParsed
 		err      error
 		cardCode *CardOrder
@@ -983,6 +983,10 @@ func (uuc *UserUseCase) EmailGet(ctx context.Context, req *pb.EmailGetRequest) (
 	lastUid, res, err = FetchNewBindOtpMailsSyncV1(ctx, "", "", last, 20)
 	if err == nil && res != nil {
 		for _, v := range res {
+			if lastUid <= last {
+				continue
+			}
+
 			_ = uuc.repo.CreateCardOrder(ctx, &CardOrder{
 				Last: uint64(lastUid),
 				Code: v.Parsed.OTP,
@@ -2836,8 +2840,8 @@ func InterlaceCreateCardholderMOR(
 	email string,
 	firstName string,
 	lastName string,
-	dob string, // YYYY-MM-DD
-	gender string, // "M" / "F"
+	dob string,         // YYYY-MM-DD
+	gender string,      // "M" / "F"
 	nationality string, // ISO2, e.g. "CN"
 	nationalId string,
 	idType string, // "CN-RIC" / "PASSPORT" / ...
