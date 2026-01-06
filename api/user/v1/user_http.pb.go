@@ -29,6 +29,7 @@ const OperationUserAdminUserBindTwo = "/api.user.v1.User/AdminUserBindTwo"
 const OperationUserAdminUserList = "/api.user.v1.User/AdminUserList"
 const OperationUserAdminWithdrawEth = "/api.user.v1.User/AdminWithdrawEth"
 const OperationUserAllInfo = "/api.user.v1.User/AllInfo"
+const OperationUserAutoUpdateAllCard = "/api.user.v1.User/AutoUpdateAllCard"
 const OperationUserCardStatusHandle = "/api.user.v1.User/CardStatusHandle"
 const OperationUserDeposit = "/api.user.v1.User/Deposit"
 const OperationUserEmailGet = "/api.user.v1.User/EmailGet"
@@ -56,6 +57,7 @@ type UserHTTPServer interface {
 	// AdminWithdrawEth 提现
 	AdminWithdrawEth(context.Context, *AdminWithdrawEthRequest) (*AdminWithdrawEthReply, error)
 	AllInfo(context.Context, *AllInfoRequest) (*AllInfoReply, error)
+	AutoUpdateAllCard(context.Context, *UpdateAllCardRequest) (*UpdateAllCardReply, error)
 	// CardStatusHandle 废弃
 	CardStatusHandle(context.Context, *CardStatusHandleRequest) (*CardStatusHandleReply, error)
 	// Deposit 充值
@@ -102,6 +104,7 @@ func RegisterUserHTTPServer(s *http.Server, srv UserHTTPServer) {
 	r.GET("/api/admin_dhb/all_info", _User_AllInfo0_HTTP_Handler(srv))
 	r.GET("/api/admin_dhb/email_get", _User_EmailGet0_HTTP_Handler(srv))
 	r.GET("/api/admin_dhb/pull_all_card_one", _User_PullAllCard0_HTTP_Handler(srv))
+	r.GET("/api/admin_dhb/auto_update_all_card", _User_AutoUpdateAllCard0_HTTP_Handler(srv))
 }
 
 func _User_OpenCardHandle0_HTTP_Handler(srv UserHTTPServer) func(ctx http.Context) error {
@@ -546,6 +549,25 @@ func _User_PullAllCard0_HTTP_Handler(srv UserHTTPServer) func(ctx http.Context) 
 	}
 }
 
+func _User_AutoUpdateAllCard0_HTTP_Handler(srv UserHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in UpdateAllCardRequest
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationUserAutoUpdateAllCard)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.AutoUpdateAllCard(ctx, req.(*UpdateAllCardRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*UpdateAllCardReply)
+		return ctx.Result(200, reply)
+	}
+}
+
 type UserHTTPClient interface {
 	AdminCardTwoList(ctx context.Context, req *AdminCardTwoRequest, opts ...http.CallOption) (rsp *AdminCardTwoReply, err error)
 	AdminConfig(ctx context.Context, req *AdminConfigRequest, opts ...http.CallOption) (rsp *AdminConfigReply, err error)
@@ -557,6 +579,7 @@ type UserHTTPClient interface {
 	AdminUserList(ctx context.Context, req *AdminUserListRequest, opts ...http.CallOption) (rsp *AdminUserListReply, err error)
 	AdminWithdrawEth(ctx context.Context, req *AdminWithdrawEthRequest, opts ...http.CallOption) (rsp *AdminWithdrawEthReply, err error)
 	AllInfo(ctx context.Context, req *AllInfoRequest, opts ...http.CallOption) (rsp *AllInfoReply, err error)
+	AutoUpdateAllCard(ctx context.Context, req *UpdateAllCardRequest, opts ...http.CallOption) (rsp *UpdateAllCardReply, err error)
 	CardStatusHandle(ctx context.Context, req *CardStatusHandleRequest, opts ...http.CallOption) (rsp *CardStatusHandleReply, err error)
 	Deposit(ctx context.Context, req *DepositRequest, opts ...http.CallOption) (rsp *DepositReply, err error)
 	EmailGet(ctx context.Context, req *EmailGetRequest, opts ...http.CallOption) (rsp *EmailGetReply, err error)
@@ -701,6 +724,19 @@ func (c *UserHTTPClientImpl) AllInfo(ctx context.Context, in *AllInfoRequest, op
 	pattern := "/api/admin_dhb/all_info"
 	path := binding.EncodeURL(pattern, in, true)
 	opts = append(opts, http.Operation(OperationUserAllInfo))
+	opts = append(opts, http.PathTemplate(pattern))
+	err := c.cc.Invoke(ctx, "GET", path, nil, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, err
+}
+
+func (c *UserHTTPClientImpl) AutoUpdateAllCard(ctx context.Context, in *UpdateAllCardRequest, opts ...http.CallOption) (*UpdateAllCardReply, error) {
+	var out UpdateAllCardReply
+	pattern := "/api/admin_dhb/auto_update_all_card"
+	path := binding.EncodeURL(pattern, in, true)
+	opts = append(opts, http.Operation(OperationUserAutoUpdateAllCard))
 	opts = append(opts, http.PathTemplate(pattern))
 	err := c.cc.Invoke(ctx, "GET", path, nil, &out, opts...)
 	if err != nil {

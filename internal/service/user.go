@@ -665,3 +665,7 @@ func (u *UserService) UpdateAllCardOne(ctx context.Context, req *pb.UpdateAllCar
 func (u *UserService) PullAllCard(ctx context.Context, req *pb.PullAllCardRequest) (*pb.PullAllCardReply, error) {
 	return u.uuc.PullAllCard(ctx, req)
 }
+
+func (u *UserService) AutoUpdateAllCard(ctx context.Context, req *pb.UpdateAllCardRequest) (*pb.UpdateAllCardReply, error) {
+	return u.uuc.AutoUpdateAllCard(ctx, req)
+}

@@ -1461,6 +1461,46 @@ func (u *UserRepo) GetCardByCardId(ctx context.Context, cardId string) (*biz.Car
 	return res, nil
 }
 
+// GetNoBindCard 按 InterlaceCreateTime 倒序取最新一条
+func (u *UserRepo) GetNoBindCard(ctx context.Context) (*biz.Card, error) {
+	var c Card
+
+	instance := u.data.DB(ctx).Table("card").
+		Where("user_id=?", 0).
+		Order("id asc")
+
+	if err := instance.First(&c).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// 没有就返回 nil, nil，或者你习惯的 NotFound 错误
+			return nil, nil
+		}
+		return nil, errors.New(500, "CARD_ERROR", err.Error())
+	}
+
+	res := &biz.Card{
+		ID:                  c.ID,
+		CardID:              c.CardID,
+		AccountID:           c.AccountID,
+		CardholderID:        c.CardholderID,
+		BalanceID:           c.BalanceID,
+		BudgetID:            c.BudgetID,
+		ReferenceID:         c.ReferenceID,
+		UserName:            c.UserName,
+		Currency:            c.Currency,
+		Bin:                 c.Bin,
+		Status:              c.Status,
+		CardMode:            c.CardMode,
+		Label:               c.Label,
+		CardLastFour:        c.CardLastFour,
+		InterlaceCreateTime: c.InterlaceCreateTime,
+		CreatedAt:           c.CreatedAt,
+		UpdatedAt:           c.UpdatedAt,
+		UserId:              c.UserId,
+	}
+
+	return res, nil
+}
+
 // GetLatestCard 按 InterlaceCreateTime 倒序取最新一条
 func (u *UserRepo) GetLatestCard(ctx context.Context) (*biz.Card, error) {
 	var c Card
@@ -1629,6 +1669,33 @@ func (u *UserRepo) UpdateUserDoing(ctx context.Context, userId uint64, cardNumbe
 		})
 	if resTwo.Error != nil || 0 >= resTwo.RowsAffected {
 		return errors.New(500, "CreateCardOne", "用户信息修改失败")
+	}
+
+	return nil
+}
+
+// UpdateUserDone 创建一条卡片记录
+func (u *UserRepo) UpdateUserDone(ctx context.Context, userId uint64, cardId string, cardAmount float64) error {
+	resTwo := u.data.DB(ctx).Table("user").Where("id=?", userId).
+		Updates(map[string]interface{}{
+			"card_order_id": "success",
+			"lock_card":     0,
+			"card_number":   cardId,
+			"change_card":   0,
+			"card_amount":   cardAmount,
+			"updated_at":    time.Now().Format("2006-01-02 15:04:05"),
+		})
+	if resTwo.Error != nil || 0 >= resTwo.RowsAffected {
+		return errors.New(500, "UpdateUserDone", "用户信息修改失败")
+	}
+
+	resThree := u.data.DB(ctx).Table("card").Where("card_id=?", cardId).
+		Updates(map[string]interface{}{
+			"user_id":    userId,
+			"updated_at": time.Now().Format("2006-01-02 15:04:05"),
+		})
+	if resThree.Error != nil || 0 >= resThree.RowsAffected {
+		return errors.New(500, "UpdateUserDone", "用户信息修改失败")
 	}
 
 	return nil

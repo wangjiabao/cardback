@@ -209,6 +209,7 @@ type UserRepo interface {
 	CreateCard(ctx context.Context, userId uint64, user *User) error
 	HasCardByCardID(ctx context.Context, cardID string) (bool, error)
 	GetCardByCardId(ctx context.Context, cardId string) (*Card, error)
+	GetNoBindCard(ctx context.Context) (*Card, error)
 	GetAllUsers() ([]*User, error)
 	UpdateCard(ctx context.Context, userId uint64, cardOrderId, card string) error
 	UpdateCardNo(ctx context.Context, userId uint64, amount float64) error
@@ -240,6 +241,7 @@ type UserRepo interface {
 	UpdateConfig(ctx context.Context, id int64, value string) (bool, error)
 	UpdateUserInfo(ctx context.Context, userId uint64, user *User) error
 	CreateCardOne(ctx context.Context, userId uint64, in *Card, isNew bool) error
+	UpdateUserDone(ctx context.Context, userId uint64, cardId string, cardAmount float64) error
 	CreateCardOnly(ctx context.Context, in *Card) error
 	CreateCardNew(ctx context.Context, userId, id uint64, in *Card, isNew bool) error
 	GetCardPage(ctx context.Context, b *Pagination, accountId, status string) ([]*Card, error, int64)
@@ -1708,7 +1710,6 @@ func (uuc *UserUseCase) PullAllCard(ctx context.Context, req *pb.PullAllCardRequ
 		}
 
 		if len(cards) == 0 {
-			fmt.Println(page)
 			break
 		}
 
@@ -1767,6 +1768,87 @@ func (uuc *UserUseCase) PullAllCard(ctx context.Context, req *pb.PullAllCardRequ
 	}
 
 	return nil, nil
+}
+
+func (uuc *UserUseCase) AutoUpdateAllCard(ctx context.Context, req *pb.UpdateAllCardRequest) (*pb.UpdateAllCardReply, error) {
+	var (
+		users []*User
+		err   error
+	)
+
+	users, err = uuc.repo.GetUsersOpenCard()
+	if nil != err {
+		fmt.Println("update all card error:", err)
+		return nil, err
+	}
+
+	// 把第一页也放到统一处理逻辑里
+	for _, v := range users {
+		var (
+			card *Card
+		)
+		card, err = uuc.repo.GetNoBindCard(ctx)
+		if nil != err {
+			fmt.Println("AutoUpdateAllCard", "err =", err)
+			continue
+		}
+
+		if nil == card {
+			fmt.Println("AutoUpdateAllCard，无卡片储备")
+			continue
+		}
+
+		var (
+			res         *InterlaceCardSummaryResp
+			cardAmount  string
+			cardAmountF float64
+		)
+		res, _ = InterlaceGetCardSummary(ctx, interlaceAccountId, card.CardID)
+		if nil != res {
+			cardAmount = res.Data.Balance.Available
+		}
+
+		// 划出余额
+		cardAmountF, _ = strconv.ParseFloat(cardAmount, 10)
+		if 0.001 <= cardAmountF {
+			fmt.Println("自动开卡，划转：", cardAmountF, cardAmount)
+
+			// 划转出去
+			data, errThree := InterlaceCardTransferOut(ctx, &InterlaceCardTransferOutReq{
+				AccountId:           interlaceAccountId,
+				CardId:              card.CardID,
+				ClientTransactionId: fmt.Sprintf("out-%d", time.Now().UnixNano()),
+				Amount:              cardAmount, // 字符串
+			})
+			if nil == data || errThree != nil {
+				fmt.Println("InterlaceCardTransferOut error:", err)
+				continue
+			}
+
+			if 3 != data.Type {
+				fmt.Println("out err", v, data)
+				continue
+			}
+
+			if "CLOSED" != data.Status {
+				fmt.Println("out status err", v, data)
+			}
+
+			if "FAIL" == data.Status {
+				fmt.Println("out status fail err", v, data)
+				continue
+			}
+			fmt.Println("自动开卡，划转：", cardAmountF, cardAmount, "完成")
+		}
+
+		if errFour := uuc.repo.UpdateUserDone(ctx, v.ID, card.CardID, cardAmountF); errFour != nil {
+			fmt.Println("AutoUpdateAllCard", "err =", err)
+			// 这条失败就算了，不影响其它
+			continue
+		}
+	}
+
+	return &pb.UpdateAllCardReply{}, nil
 }
 
 func (uuc *UserUseCase) UpdateAllCardTwo(ctx context.Context, req *pb.UpdateAllCardRequest) (*pb.UpdateAllCardReply, error) {
@@ -2969,8 +3051,8 @@ func InterlaceCreateCardholderMOR(
 	email string,
 	firstName string,
 	lastName string,
-	dob string,         // YYYY-MM-DD
-	gender string,      // "M" / "F"
+	dob string, // YYYY-MM-DD
+	gender string, // "M" / "F"
 	nationality string, // ISO2, e.g. "CN"
 	nationalId string,
 	idType string, // "CN-RIC" / "PASSPORT" / ...
@@ -3965,4 +4047,97 @@ func forceCloseIMAP(c *client.Client) {
 		return
 	}
 	_ = c.Logout()
+}
+
+// /cards/{id}/card-summary 返回体
+type InterlaceCardSummaryResp struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+	Data    struct {
+		CardId    string `json:"cardId"`
+		AccountId string `json:"accountId"`
+
+		Balance struct {
+			ID        string `json:"id"`
+			Available string `json:"available"`
+			Currency  string `json:"currency"`
+		} `json:"balance"`
+
+		Statistics struct {
+			Consumption    string `json:"consumption"`
+			Reversal       string `json:"reversal"`
+			ReversalFee    string `json:"reversalFee"`
+			Refund         string `json:"refund"`
+			RefundFee      string `json:"refundFee"`
+			NetConsumption string `json:"netConsumption"`
+			Currency       string `json:"currency"`
+		} `json:"statistics"`
+
+		VelocityControl struct {
+			Type      string `json:"type"` // DAY/WEEK/MONTH/.../NA
+			Limit     string `json:"limit"`
+			Available string `json:"available"`
+		} `json:"velocityControl"`
+	} `json:"data"`
+}
+
+// InterlaceGetCardSummary 获取卡片 summary（余额/统计/限额）
+func InterlaceGetCardSummary(ctx context.Context, accountId, cardId string) (*InterlaceCardSummaryResp, error) {
+	if accountId == "" {
+		return nil, fmt.Errorf("accountId is required")
+	}
+	if cardId == "" {
+		return nil, fmt.Errorf("cardId is required")
+	}
+
+	accessToken, err := GetInterlaceAccessToken(ctx)
+	if err != nil || accessToken == "" {
+		fmt.Println("获取access token错误")
+		return nil, err
+	}
+
+	// interlaceBaseURL 建议: https://api-sandbox.interlace.money/open-api/v3
+	base := interlaceBaseURL + "/cards/" + cardId + "/card-summary"
+
+	q := url.Values{}
+	q.Set("accountId", accountId)
+	urlStr := base + "?" + q.Encode()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, urlStr, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("x-access-token", accessToken)
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	// 方便你调试
+	// fmt.Println("card-summary resp:", string(body))
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+
+		fmt.Println("at", interlaceAuth, time.Now().Unix())
+		return nil, fmt.Errorf("interlace card summary http %d: %s", resp.StatusCode, string(body))
+	}
+
+	var outer InterlaceCardSummaryResp
+	if err := json.Unmarshal(body, &outer); err != nil {
+		return nil, fmt.Errorf("card summary unmarshal: %w", err)
+	}
+	if outer.Code != "000000" {
+		return nil, fmt.Errorf("card summary failed: code=%s msg=%s", outer.Code, outer.Message)
+	}
+
+	return &outer, nil
 }
