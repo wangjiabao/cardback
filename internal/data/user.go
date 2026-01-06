@@ -1461,12 +1461,13 @@ func (u *UserRepo) GetCardByCardId(ctx context.Context, cardId string) (*biz.Car
 	return res, nil
 }
 
-// GetNoBindCard 按 InterlaceCreateTime 倒序取最新一条
-func (u *UserRepo) GetNoBindCard(ctx context.Context) (*biz.Card, error) {
+// GetNoBindCardV 按 InterlaceCreateTime 倒序取最新一条
+func (u *UserRepo) GetNoBindCardV(ctx context.Context) (*biz.Card, error) {
 	var c Card
 
 	instance := u.data.DB(ctx).Table("card").
 		Where("user_id=?", 0).
+		Where("card_mode=?", "VIRTUAL_CARD").
 		Order("id asc")
 
 	if err := instance.First(&c).Error; err != nil {
