@@ -10,6 +10,7 @@ paths:
         post:
             tags:
                 - User
+            description: 虚拟卡手动绑定，进处理队列
             operationId: User_AdminUserBind
             requestBody:
                 content:
@@ -34,6 +35,7 @@ paths:
         post:
             tags:
                 - User
+            description: 实体卡手动绑定，进处理队列
             operationId: User_AdminUserBindTwo
             requestBody:
                 content:
@@ -76,6 +78,7 @@ paths:
         get:
             tags:
                 - User
+            description: 废弃
             operationId: User_CardStatusHandle
             responses:
                 "200":
@@ -167,6 +170,7 @@ paths:
         get:
             tags:
                 - User
+            description: 充值
             operationId: User_Deposit
             responses:
                 "200":
@@ -227,7 +231,7 @@ paths:
         get:
             tags:
                 - User
-            description: 开卡
+            description: 开卡，废弃
             operationId: User_OpenCardHandle
             responses:
                 "200":
@@ -242,10 +246,29 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /api/admin_dhb/pull_all_card_one:
+        get:
+            tags:
+                - User
+            operationId: User_PullAllCard
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/PullAllCardReply'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /api/admin_dhb/reward_card_two:
         get:
             tags:
                 - User
+            description: 实体卡分红
             operationId: User_RewardCardTwo
             responses:
                 "200":
@@ -295,6 +318,7 @@ paths:
         post:
             tags:
                 - User
+            description: 设置用户客户端调整分红级别虚拟卡
             operationId: User_UpdateCanVip
             requestBody:
                 content:
@@ -319,6 +343,7 @@ paths:
         post:
             tags:
                 - User
+            description: 清除用户申请卡片次数，目前无用
             operationId: User_SetUserCount
             requestBody:
                 content:
@@ -343,6 +368,7 @@ paths:
         post:
             tags:
                 - User
+            description: 废弃
             operationId: User_UpdateUserInfoTo
             requestBody:
                 content:
@@ -367,6 +393,7 @@ paths:
         post:
             tags:
                 - User
+            description: 设置实体卡分红级别
             operationId: User_SetVipThree
             requestBody:
                 content:
@@ -470,6 +497,7 @@ paths:
         get:
             tags:
                 - User
+            description: 提现
             operationId: User_AdminWithdrawEth
             responses:
                 "200":
@@ -769,6 +797,9 @@ components:
             properties:
                 status:
                     type: string
+        PullAllCardReply:
+            type: object
+            properties: {}
         RewardCardTwoReply:
             type: object
             properties: {}

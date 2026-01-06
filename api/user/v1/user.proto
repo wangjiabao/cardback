@@ -9,31 +9,35 @@ option java_multiple_files = true;
 option java_package = "api.user.v1";
 
 service User {
-	// 开卡
+	// 开卡，废弃
 	rpc OpenCardHandle (OpenCardHandleRequest) returns (OpenCardHandleReply) {
 		option (google.api.http) = {
 			get: "/api/admin_dhb/open_card_handle"
 		};
 	};
 
+	// 废弃
 	rpc CardStatusHandle (CardStatusHandleRequest) returns (CardStatusHandleReply) {
 		option (google.api.http) = {
 			get: "/api/admin_dhb/card_status_handle"
 		};
 	};
 
+	// 充值
 	rpc Deposit (DepositRequest) returns (DepositReply) {
 		option (google.api.http) = {
 			get: "/api/admin_dhb/deposit"
 		};
 	};
 
+	// 提现
 	rpc AdminWithdrawEth (AdminWithdrawEthRequest) returns (AdminWithdrawEthReply) {
 		option (google.api.http) = {
 			get: "/api/admin_dhb/withdraw_eth"
 		};
 	};
 
+	// 实体卡分红
 	rpc RewardCardTwo (RewardCardTwoRequest) returns (RewardCardTwoReply) {
 		option (google.api.http) = {
 			get: "/api/admin_dhb/reward_card_two"
@@ -58,6 +62,7 @@ service User {
 		};
 	};
 
+	// 虚拟卡手动绑定，进处理队列
 	rpc AdminUserBind (AdminUserBindRequest) returns (AdminUserBindReply) {
 		option (google.api.http) = {
 			post: "/api/admin_dhb/admin_user_bind"
@@ -65,6 +70,7 @@ service User {
 		};
 	};
 
+	// 实体卡手动绑定，进处理队列
 	rpc AdminUserBindTwo (AdminUserBindTwoRequest) returns (AdminUserBindTwoReply) {
 		option (google.api.http) = {
 			post: "/api/admin_dhb/admin_user_bind_two"
@@ -79,6 +85,7 @@ service User {
 		};
 	};
 
+	// 废弃
 	rpc UpdateUserInfoTo (UpdateUserInfoToRequest) returns (UpdateUserInfoToReply) {
 		option (google.api.http) = {
 			post: "/api/admin_dhb/set_user_info_to"
@@ -86,6 +93,7 @@ service User {
 		};
 	};
 
+	// 设置用户客户端调整分红级别虚拟卡
 	rpc UpdateCanVip (UpdateCanVipRequest) returns (UpdateCanVipReply) {
 		option (google.api.http) = {
 			post: "/api/admin_dhb/set_can_vip"
@@ -93,6 +101,7 @@ service User {
 		};
 	};
 
+	// 设置实体卡分红级别
 	rpc SetVipThree (SetVipThreeRequest) returns (SetVipThreeReply) {
 		option (google.api.http) = {
 			post: "/api/admin_dhb/set_vip_three"
@@ -100,6 +109,7 @@ service User {
 		};
 	};
 
+	// 清除用户申请卡片次数，目前无用
 	rpc SetUserCount (SetUserCountRequest) returns (SetUserCountReply) {
 		option (google.api.http) = {
 			post: "/api/admin_dhb/set_user_count"
@@ -143,6 +153,12 @@ service User {
 			get: "/api/admin_dhb/email_get"
 		};
 	};
+
+	rpc PullAllCard (PullAllCardRequest) returns (PullAllCardReply) {
+		option (google.api.http) = {
+			get: "/api/admin_dhb/pull_all_card_one"
+		};
+	};
 }
 
 message AdminConfigUpdateRequest {
@@ -167,6 +183,14 @@ message UpdateAllCardReply {
 
 message UpdateAllCardRequest {
 }
+
+message PullAllCardReply {
+
+}
+
+message PullAllCardRequest {
+}
+
 
 message AllInfoReply {
 	uint64 totalUser = 1; //

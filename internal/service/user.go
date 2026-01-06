@@ -33,50 +33,53 @@ func NewUserService(uuc *biz.UserUseCase, logger log.Logger, ca *conf.Auth) *Use
 	return &UserService{uuc: uuc, log: log.NewHelper(logger), ca: ca}
 }
 
+// OpenCardHandle 废弃
 func (u *UserService) OpenCardHandle(ctx context.Context, req *pb.OpenCardHandleRequest) (*pb.OpenCardHandleReply, error) {
-	end := time.Now().UTC().Add(50 * time.Second)
-
-	var (
-		err error
-	)
-	for i := 1; i <= 10; i++ {
-		now := time.Now().UTC()
-		if end.Before(now) {
-			break
-		}
-
-		err = u.uuc.OpenCardHandle(ctx)
-		if nil != err {
-			fmt.Println(err)
-		}
-		time.Sleep(5 * time.Second)
-	}
+	//end := time.Now().UTC().Add(50 * time.Second)
+	//
+	//var (
+	//	err error
+	//)
+	//for i := 1; i <= 10; i++ {
+	//	now := time.Now().UTC()
+	//	if end.Before(now) {
+	//		break
+	//	}
+	//
+	//	err = u.uuc.OpenCardHandle(ctx)
+	//	if nil != err {
+	//		fmt.Println(err)
+	//	}
+	//	time.Sleep(5 * time.Second)
+	//}
 
 	return nil, nil
 }
 
+// CardStatusHandle 废弃
 func (u *UserService) CardStatusHandle(ctx context.Context, req *pb.CardStatusHandleRequest) (*pb.CardStatusHandleReply, error) {
-	end := time.Now().UTC().Add(50 * time.Second)
-
-	var (
-		err error
-	)
-	for i := 1; i <= 10; i++ {
-		now := time.Now().UTC()
-		if end.Before(now) {
-			break
-		}
-
-		err = u.uuc.CardStatusHandle(ctx)
-		if nil != err {
-			fmt.Println(err)
-		}
-		time.Sleep(5 * time.Second)
-	}
+	//end := time.Now().UTC().Add(50 * time.Second)
+	//
+	//var (
+	//	err error
+	//)
+	//for i := 1; i <= 10; i++ {
+	//	now := time.Now().UTC()
+	//	if end.Before(now) {
+	//		break
+	//	}
+	//
+	//	err = u.uuc.CardStatusHandle(ctx)
+	//	if nil != err {
+	//		fmt.Println(err)
+	//	}
+	//	time.Sleep(5 * time.Second)
+	//}
 
 	return nil, nil
 }
 
+// RewardCardTwo 实体卡分红
 func (u *UserService) RewardCardTwo(ctx context.Context, req *pb.RewardCardTwoRequest) (*pb.RewardCardTwoReply, error) {
 	end := time.Now().UTC().Add(50 * time.Second)
 
@@ -99,6 +102,7 @@ func (u *UserService) RewardCardTwo(ctx context.Context, req *pb.RewardCardTwoRe
 	return nil, nil
 }
 
+// Deposit 充值
 func (u *UserService) Deposit(ctx context.Context, req *pb.DepositRequest) (*pb.DepositReply, error) {
 	end := time.Now().UTC().Add(50 * time.Second)
 
@@ -225,6 +229,7 @@ func FloatTo18DecimalsString(f float64) string {
 	return integerPart + decimalPart
 }
 
+// AdminWithdrawEth 提现
 func (u *UserService) AdminWithdrawEth(ctx context.Context, req *pb.AdminWithdrawEthRequest) (*pb.AdminWithdrawEthReply, error) {
 	var (
 		withdraw     *biz.Withdraw
@@ -320,42 +325,52 @@ func (u *UserService) AdminUserList(ctx context.Context, req *pb.AdminUserListRe
 	return u.uuc.AdminUserList(ctx, req)
 }
 
+// AdminCardTwoList 实体卡申请列表
 func (u *UserService) AdminCardTwoList(ctx context.Context, req *pb.AdminCardTwoRequest) (*pb.AdminCardTwoReply, error) {
 	return u.uuc.AdminCardTwoList(ctx, req)
 }
 
+// AdminUserBind  手动绑定虚拟卡，添加进绑定队列
 func (u *UserService) AdminUserBind(ctx context.Context, req *pb.AdminUserBindRequest) (*pb.AdminUserBindReply, error) {
 	return u.uuc.AdminUserBind(ctx, req)
 }
 
+// AdminUserBindTwo  手动绑定实体卡，添加进绑定队列
 func (u *UserService) AdminUserBindTwo(ctx context.Context, req *pb.AdminUserBindTwoRequest) (*pb.AdminUserBindTwoReply, error) {
 	return u.uuc.AdminUserBindTwo(ctx, req)
 }
 
+// UpdateUserInfoTo 废弃
 func (u *UserService) UpdateUserInfoTo(ctx context.Context, req *pb.UpdateUserInfoToRequest) (*pb.UpdateUserInfoToReply, error) {
 	return nil, nil
 }
 
+// UpdateUserInfoToKyc 废弃
 func (u *UserService) UpdateUserInfoToKyc(ctx transporthttp.Context) error {
 	return u.uuc.UpdateUserInfoTo(ctx)
 }
 
+// UpdateCanVip 设置用户客户端调整分红级别虚拟卡
 func (u *UserService) UpdateCanVip(ctx context.Context, req *pb.UpdateCanVipRequest) (*pb.UpdateCanVipReply, error) {
 	return u.uuc.UpdateCanVip(ctx, req)
 }
 
+// SetVipThree 设置实体卡分红级别
 func (u *UserService) SetVipThree(ctx context.Context, req *pb.SetVipThreeRequest) (*pb.SetVipThreeReply, error) {
 	return u.uuc.SetVipThree(ctx, req)
 }
 
+// SetUserCount 清除用户申请卡片次数，目前无用
 func (u *UserService) SetUserCount(ctx context.Context, req *pb.SetUserCountRequest) (*pb.SetUserCountReply, error) {
 	return u.uuc.SetUserCount(ctx, req)
 }
 
+// AdminConfig 配置
 func (u *UserService) AdminConfig(ctx context.Context, req *pb.AdminConfigRequest) (*pb.AdminConfigReply, error) {
 	return u.uuc.AdminConfig(ctx, req)
 }
 
+// AdminConfigUpdate 配置更新
 func (u *UserService) AdminConfigUpdate(ctx context.Context, req *pb.AdminConfigUpdateRequest) (*pb.AdminConfigUpdateReply, error) {
 	return u.uuc.AdminConfigUpdate(ctx, req)
 }
@@ -364,6 +379,7 @@ func (u *UserService) AllInfo(ctx context.Context, req *pb.AllInfoRequest) (*pb.
 	return u.uuc.AllInfo(ctx, req)
 }
 
+// EmailGet 邮件转发
 func (u *UserService) EmailGet(ctx context.Context, req *pb.EmailGetRequest) (*pb.EmailGetReply, error) {
 	end := time.Now().UTC().Add(50 * time.Second)
 
@@ -395,6 +411,7 @@ type CallbackRequest struct {
 	Data      json.RawMessage `json:"data"` // 用 RawMessage 接收动态结构
 }
 
+// CallBack 废弃
 func (u *UserService) CallBack(w http.ResponseWriter, r *http.Request) {
 	// 从 http.Request 获取 context.Context
 	ctx := r.Context()
@@ -635,10 +652,16 @@ func toToken(userPrivateKey string, toAccount string, withdrawAmount string, wit
 	return "", nil
 }
 
+// 实体卡
 func (u *UserService) UpdateAllCard(ctx context.Context, req *pb.UpdateAllCardRequest) (*pb.UpdateAllCardReply, error) {
 	return u.uuc.UpdateAllCard(ctx, req)
 }
 
+// 虚拟卡
 func (u *UserService) UpdateAllCardOne(ctx context.Context, req *pb.UpdateAllCardRequest) (*pb.UpdateAllCardReply, error) {
 	return u.uuc.UpdateAllCardTwo(ctx, req)
+}
+
+func (u *UserService) PullAllCard(ctx context.Context, req *pb.PullAllCardRequest) (*pb.PullAllCardReply, error) {
+	return u.uuc.PullAllCard(ctx, req)
 }

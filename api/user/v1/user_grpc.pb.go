@@ -40,27 +40,38 @@ const (
 	User_UpdateAllCardOne_FullMethodName  = "/api.user.v1.User/UpdateAllCardOne"
 	User_AllInfo_FullMethodName           = "/api.user.v1.User/AllInfo"
 	User_EmailGet_FullMethodName          = "/api.user.v1.User/EmailGet"
+	User_PullAllCard_FullMethodName       = "/api.user.v1.User/PullAllCard"
 )
 
 // UserClient is the client API for User service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type UserClient interface {
-	// 开卡
+	// 开卡，废弃
 	OpenCardHandle(ctx context.Context, in *OpenCardHandleRequest, opts ...grpc.CallOption) (*OpenCardHandleReply, error)
+	// 废弃
 	CardStatusHandle(ctx context.Context, in *CardStatusHandleRequest, opts ...grpc.CallOption) (*CardStatusHandleReply, error)
+	// 充值
 	Deposit(ctx context.Context, in *DepositRequest, opts ...grpc.CallOption) (*DepositReply, error)
+	// 提现
 	AdminWithdrawEth(ctx context.Context, in *AdminWithdrawEthRequest, opts ...grpc.CallOption) (*AdminWithdrawEthReply, error)
+	// 实体卡分红
 	RewardCardTwo(ctx context.Context, in *RewardCardTwoRequest, opts ...grpc.CallOption) (*RewardCardTwoReply, error)
 	AdminRewardList(ctx context.Context, in *AdminRewardListRequest, opts ...grpc.CallOption) (*AdminRewardListReply, error)
 	AdminUserList(ctx context.Context, in *AdminUserListRequest, opts ...grpc.CallOption) (*AdminUserListReply, error)
 	AdminCardTwoList(ctx context.Context, in *AdminCardTwoRequest, opts ...grpc.CallOption) (*AdminCardTwoReply, error)
+	// 虚拟卡手动绑定，进处理队列
 	AdminUserBind(ctx context.Context, in *AdminUserBindRequest, opts ...grpc.CallOption) (*AdminUserBindReply, error)
+	// 实体卡手动绑定，进处理队列
 	AdminUserBindTwo(ctx context.Context, in *AdminUserBindTwoRequest, opts ...grpc.CallOption) (*AdminUserBindTwoReply, error)
 	AdminLogin(ctx context.Context, in *AdminLoginRequest, opts ...grpc.CallOption) (*AdminLoginReply, error)
+	// 废弃
 	UpdateUserInfoTo(ctx context.Context, in *UpdateUserInfoToRequest, opts ...grpc.CallOption) (*UpdateUserInfoToReply, error)
+	// 设置用户客户端调整分红级别虚拟卡
 	UpdateCanVip(ctx context.Context, in *UpdateCanVipRequest, opts ...grpc.CallOption) (*UpdateCanVipReply, error)
+	// 设置实体卡分红级别
 	SetVipThree(ctx context.Context, in *SetVipThreeRequest, opts ...grpc.CallOption) (*SetVipThreeReply, error)
+	// 清除用户申请卡片次数，目前无用
 	SetUserCount(ctx context.Context, in *SetUserCountRequest, opts ...grpc.CallOption) (*SetUserCountReply, error)
 	AdminConfig(ctx context.Context, in *AdminConfigRequest, opts ...grpc.CallOption) (*AdminConfigReply, error)
 	AdminConfigUpdate(ctx context.Context, in *AdminConfigUpdateRequest, opts ...grpc.CallOption) (*AdminConfigUpdateReply, error)
@@ -68,6 +79,7 @@ type UserClient interface {
 	UpdateAllCardOne(ctx context.Context, in *UpdateAllCardRequest, opts ...grpc.CallOption) (*UpdateAllCardReply, error)
 	AllInfo(ctx context.Context, in *AllInfoRequest, opts ...grpc.CallOption) (*AllInfoReply, error)
 	EmailGet(ctx context.Context, in *EmailGetRequest, opts ...grpc.CallOption) (*EmailGetReply, error)
+	PullAllCard(ctx context.Context, in *PullAllCardRequest, opts ...grpc.CallOption) (*PullAllCardReply, error)
 }
 
 type userClient struct {
@@ -267,25 +279,44 @@ func (c *userClient) EmailGet(ctx context.Context, in *EmailGetRequest, opts ...
 	return out, nil
 }
 
+func (c *userClient) PullAllCard(ctx context.Context, in *PullAllCardRequest, opts ...grpc.CallOption) (*PullAllCardReply, error) {
+	out := new(PullAllCardReply)
+	err := c.cc.Invoke(ctx, User_PullAllCard_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // UserServer is the server API for User service.
 // All implementations must embed UnimplementedUserServer
 // for forward compatibility
 type UserServer interface {
-	// 开卡
+	// 开卡，废弃
 	OpenCardHandle(context.Context, *OpenCardHandleRequest) (*OpenCardHandleReply, error)
+	// 废弃
 	CardStatusHandle(context.Context, *CardStatusHandleRequest) (*CardStatusHandleReply, error)
+	// 充值
 	Deposit(context.Context, *DepositRequest) (*DepositReply, error)
+	// 提现
 	AdminWithdrawEth(context.Context, *AdminWithdrawEthRequest) (*AdminWithdrawEthReply, error)
+	// 实体卡分红
 	RewardCardTwo(context.Context, *RewardCardTwoRequest) (*RewardCardTwoReply, error)
 	AdminRewardList(context.Context, *AdminRewardListRequest) (*AdminRewardListReply, error)
 	AdminUserList(context.Context, *AdminUserListRequest) (*AdminUserListReply, error)
 	AdminCardTwoList(context.Context, *AdminCardTwoRequest) (*AdminCardTwoReply, error)
+	// 虚拟卡手动绑定，进处理队列
 	AdminUserBind(context.Context, *AdminUserBindRequest) (*AdminUserBindReply, error)
+	// 实体卡手动绑定，进处理队列
 	AdminUserBindTwo(context.Context, *AdminUserBindTwoRequest) (*AdminUserBindTwoReply, error)
 	AdminLogin(context.Context, *AdminLoginRequest) (*AdminLoginReply, error)
+	// 废弃
 	UpdateUserInfoTo(context.Context, *UpdateUserInfoToRequest) (*UpdateUserInfoToReply, error)
+	// 设置用户客户端调整分红级别虚拟卡
 	UpdateCanVip(context.Context, *UpdateCanVipRequest) (*UpdateCanVipReply, error)
+	// 设置实体卡分红级别
 	SetVipThree(context.Context, *SetVipThreeRequest) (*SetVipThreeReply, error)
+	// 清除用户申请卡片次数，目前无用
 	SetUserCount(context.Context, *SetUserCountRequest) (*SetUserCountReply, error)
 	AdminConfig(context.Context, *AdminConfigRequest) (*AdminConfigReply, error)
 	AdminConfigUpdate(context.Context, *AdminConfigUpdateRequest) (*AdminConfigUpdateReply, error)
@@ -293,6 +324,7 @@ type UserServer interface {
 	UpdateAllCardOne(context.Context, *UpdateAllCardRequest) (*UpdateAllCardReply, error)
 	AllInfo(context.Context, *AllInfoRequest) (*AllInfoReply, error)
 	EmailGet(context.Context, *EmailGetRequest) (*EmailGetReply, error)
+	PullAllCard(context.Context, *PullAllCardRequest) (*PullAllCardReply, error)
 	mustEmbedUnimplementedUserServer()
 }
 
@@ -362,6 +394,9 @@ func (UnimplementedUserServer) AllInfo(context.Context, *AllInfoRequest) (*AllIn
 }
 func (UnimplementedUserServer) EmailGet(context.Context, *EmailGetRequest) (*EmailGetReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method EmailGet not implemented")
+}
+func (UnimplementedUserServer) PullAllCard(context.Context, *PullAllCardRequest) (*PullAllCardReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method PullAllCard not implemented")
 }
 func (UnimplementedUserServer) mustEmbedUnimplementedUserServer() {}
 
@@ -754,6 +789,24 @@ func _User_EmailGet_Handler(srv interface{}, ctx context.Context, dec func(inter
 	return interceptor(ctx, in, info, handler)
 }
 
+func _User_PullAllCard_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PullAllCardRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServer).PullAllCard(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: User_PullAllCard_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServer).PullAllCard(ctx, req.(*PullAllCardRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // User_ServiceDesc is the grpc.ServiceDesc for User service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -844,6 +897,10 @@ var User_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "EmailGet",
 			Handler:    _User_EmailGet_Handler,
+		},
+		{
+			MethodName: "PullAllCard",
+			Handler:    _User_PullAllCard_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

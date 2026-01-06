@@ -208,6 +208,7 @@ type UserRepo interface {
 	GetUserByUserIdsTwo(userIds []uint64) (map[uint64]*User, error)
 	CreateCard(ctx context.Context, userId uint64, user *User) error
 	HasCardByCardID(ctx context.Context, cardID string) (bool, error)
+	GetCardByCardId(ctx context.Context, cardId string) (*Card, error)
 	GetAllUsers() ([]*User, error)
 	UpdateCard(ctx context.Context, userId uint64, cardOrderId, card string) error
 	UpdateCardNo(ctx context.Context, userId uint64, amount float64) error
@@ -238,8 +239,9 @@ type UserRepo interface {
 	GetConfigs() ([]*Config, error)
 	UpdateConfig(ctx context.Context, id int64, value string) (bool, error)
 	UpdateUserInfo(ctx context.Context, userId uint64, user *User) error
-	CreateCardOne(ctx context.Context, userId uint64, in *Card) error
-	CreateCardNew(ctx context.Context, userId, id uint64, in *Card) error
+	CreateCardOne(ctx context.Context, userId uint64, in *Card, isNew bool) error
+	CreateCardOnly(ctx context.Context, in *Card) error
+	CreateCardNew(ctx context.Context, userId, id uint64, in *Card, isNew bool) error
 	GetCardPage(ctx context.Context, b *Pagination, accountId, status string) ([]*Card, error, int64)
 	GetLatestCard(ctx context.Context) (*Card, error)
 	GetCardTwoStatusOne() ([]*CardTwo, error)
@@ -1655,15 +1657,116 @@ func (uuc *UserUseCase) UpdateAllCard(ctx context.Context, req *pb.UpdateAllCard
 				InterlaceCreateTime: tmpCreateTime, // 毫秒时间戳
 			}
 
-			if errThree := uuc.repo.CreateCardNew(ctx, v.UserId, v.ID, card); errThree != nil {
-				fmt.Println("CreateCard error, cardID =", ic.ID, "err =", err)
-				// 这条失败就算了，不影响其它
+			var (
+				ifHas *Card
+			)
+			ifHas, err = uuc.repo.GetCardByCardId(ctx, card.CardID)
+			if nil != err {
 				continue
+			}
+
+			if nil != ifHas {
+				if 0 >= ifHas.UserId {
+					if err = uuc.tx.ExecTx(ctx, func(ctx context.Context) error { // 事务
+						return uuc.repo.CreateCardNew(ctx, v.UserId, v.ID, card, false)
+					}); nil != err {
+						fmt.Println("CreateCard error, cardID =", ic.ID, "err =", err)
+						continue
+					}
+				} else {
+					fmt.Println("已绑定", ic, ifHas)
+					continue
+				}
+			} else {
+				if err = uuc.tx.ExecTx(ctx, func(ctx context.Context) error { // 事务
+					return uuc.repo.CreateCardNew(ctx, v.UserId, v.ID, card, true)
+				}); nil != err {
+					fmt.Println("CreateCard error, cardID =", ic.ID, "err =", err)
+					continue
+				}
 			}
 		}
 	}
 
 	return &pb.UpdateAllCardReply{}, nil
+}
+
+func (uuc *UserUseCase) PullAllCard(ctx context.Context, req *pb.PullAllCardRequest) (*pb.PullAllCardReply, error) {
+
+	for page := 1; page < 10000; page++ {
+		var cards []*InterlaceCard
+
+		cards, _, errTwo := InterlaceListCards(ctx, &InterlaceListCardsReq{
+			AccountId: interlaceAccountId,
+			Page:      page,
+			Limit:     100,
+		})
+		if nil == cards || errTwo != nil {
+			fmt.Println("InterlaceListCards page", "error:", errTwo)
+			// 拉失败这一页就跳过，继续后面的
+			continue
+		}
+
+		if len(cards) == 0 {
+			fmt.Println(page)
+			break
+		}
+
+		for _, ic := range cards {
+			// 只保留 ACTIVE
+			if ic.Status != "ACTIVE" {
+				continue
+			}
+
+			var (
+				err error
+			)
+			var tmpCreateTime int64
+			tmpCreateTime, err = strconv.ParseInt(ic.CreateTime, 10, 64)
+			if 0 >= tmpCreateTime || nil != err {
+				fmt.Println("InterlaceListCards create time", ic, "error:", err)
+				// 出错就整体结束本次同步，避免老数据乱插
+				break
+			}
+
+			// 组装 biz.Card 对象
+			card := &Card{
+				CardID:              ic.ID,
+				AccountID:           ic.AccountID,
+				CardholderID:        ic.CardholderID,
+				BalanceID:           ic.BalanceID,
+				BudgetID:            ic.BudgetID,
+				ReferenceID:         ic.ReferenceID,
+				UserName:            ic.UserName,
+				Currency:            ic.Currency,
+				Bin:                 ic.Bin,
+				Status:              ic.Status,
+				CardMode:            ic.CardMode,
+				Label:               ic.Label,
+				CardLastFour:        ic.CardLastFour,
+				InterlaceCreateTime: tmpCreateTime, // 毫秒时间戳
+			}
+
+			var (
+				ifHas *Card
+			)
+			ifHas, err = uuc.repo.GetCardByCardId(ctx, card.CardID)
+			if nil != err {
+				continue
+			}
+
+			if nil == ifHas {
+				if err = uuc.tx.ExecTx(ctx, func(ctx context.Context) error { // 事务
+					return uuc.repo.CreateCardOnly(ctx, card)
+				}); nil != err {
+					fmt.Println("CreateCardOnly error, cardID =", ic.ID, "err =", err)
+					continue
+				}
+			}
+		}
+	}
+
+	return nil, nil
 }
 
 func (uuc *UserUseCase) UpdateAllCardTwo(ctx context.Context, req *pb.UpdateAllCardRequest) (*pb.UpdateAllCardReply, error) {
@@ -1784,10 +1887,33 @@ func (uuc *UserUseCase) UpdateAllCardTwo(ctx context.Context, req *pb.UpdateAllC
 				InterlaceCreateTime: tmpCreateTime, // 毫秒时间戳
 			}
 
-			if errThree := uuc.repo.CreateCardOne(ctx, v.ID, card); errThree != nil {
-				fmt.Println("CreateCardOne error, cardID =", ic.ID, "err =", err)
-				// 这条失败就算了，不影响其它
+			var (
+				ifHas *Card
+			)
+			ifHas, err = uuc.repo.GetCardByCardId(ctx, card.CardID)
+			if nil != err {
 				continue
+			}
+
+			if nil != ifHas {
+				if 0 >= ifHas.UserId {
+					if err = uuc.tx.ExecTx(ctx, func(ctx context.Context) error { // 事务
+						return uuc.repo.CreateCardOne(ctx, v.ID, card, false)
+					}); nil != err {
+						fmt.Println("CreateCardOne error, cardID =", ic.ID, "err =", err)
+						continue
+					}
+				} else {
+					fmt.Println("已绑定", ic, ifHas)
+					continue
+				}
+			} else {
+				if err = uuc.tx.ExecTx(ctx, func(ctx context.Context) error { // 事务
+					return uuc.repo.CreateCardOne(ctx, v.ID, card, true)
+				}); nil != err {
+					fmt.Println("CreateCardOne error, cardID =", ic.ID, "err =", err)
+					continue
+				}
 			}
 
 			// 分红
@@ -1996,6 +2122,7 @@ type RechargeData struct {
 	CardNumber string `json:"cardNumber"`
 }
 
+// CallBackHandleOne 废弃
 func (uuc *UserUseCase) CallBackHandleOne(ctx context.Context, r *CardUserHandle) error {
 	fmt.Println("结果：", r)
 	var (
@@ -2017,6 +2144,7 @@ func (uuc *UserUseCase) CallBackHandleOne(ctx context.Context, r *CardUserHandle
 	return nil
 }
 
+// CallBackHandleTwo 废弃
 func (uuc *UserUseCase) CallBackHandleTwo(ctx context.Context, r *CardCreateData) error {
 	fmt.Println("结果：", r)
 	var (
@@ -2038,6 +2166,7 @@ func (uuc *UserUseCase) CallBackHandleTwo(ctx context.Context, r *CardCreateData
 	return nil
 }
 
+// CallBackHandleThree 废弃
 func (uuc *UserUseCase) CallBackHandleThree(ctx context.Context, r *RechargeData) error {
 	fmt.Println("结果：", r)
 	var (
@@ -2840,8 +2969,8 @@ func InterlaceCreateCardholderMOR(
 	email string,
 	firstName string,
 	lastName string,
-	dob string, // YYYY-MM-DD
-	gender string, // "M" / "F"
+	dob string,         // YYYY-MM-DD
+	gender string,      // "M" / "F"
 	nationality string, // ISO2, e.g. "CN"
 	nationalId string,
 	idType string, // "CN-RIC" / "PASSPORT" / ...

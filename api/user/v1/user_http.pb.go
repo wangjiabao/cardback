@@ -33,6 +33,7 @@ const OperationUserCardStatusHandle = "/api.user.v1.User/CardStatusHandle"
 const OperationUserDeposit = "/api.user.v1.User/Deposit"
 const OperationUserEmailGet = "/api.user.v1.User/EmailGet"
 const OperationUserOpenCardHandle = "/api.user.v1.User/OpenCardHandle"
+const OperationUserPullAllCard = "/api.user.v1.User/PullAllCard"
 const OperationUserRewardCardTwo = "/api.user.v1.User/RewardCardTwo"
 const OperationUserSetUserCount = "/api.user.v1.User/SetUserCount"
 const OperationUserSetVipThree = "/api.user.v1.User/SetVipThree"
@@ -47,22 +48,33 @@ type UserHTTPServer interface {
 	AdminConfigUpdate(context.Context, *AdminConfigUpdateRequest) (*AdminConfigUpdateReply, error)
 	AdminLogin(context.Context, *AdminLoginRequest) (*AdminLoginReply, error)
 	AdminRewardList(context.Context, *AdminRewardListRequest) (*AdminRewardListReply, error)
+	// AdminUserBind 虚拟卡手动绑定，进处理队列
 	AdminUserBind(context.Context, *AdminUserBindRequest) (*AdminUserBindReply, error)
+	// AdminUserBindTwo 实体卡手动绑定，进处理队列
 	AdminUserBindTwo(context.Context, *AdminUserBindTwoRequest) (*AdminUserBindTwoReply, error)
 	AdminUserList(context.Context, *AdminUserListRequest) (*AdminUserListReply, error)
+	// AdminWithdrawEth 提现
 	AdminWithdrawEth(context.Context, *AdminWithdrawEthRequest) (*AdminWithdrawEthReply, error)
 	AllInfo(context.Context, *AllInfoRequest) (*AllInfoReply, error)
+	// CardStatusHandle 废弃
 	CardStatusHandle(context.Context, *CardStatusHandleRequest) (*CardStatusHandleReply, error)
+	// Deposit 充值
 	Deposit(context.Context, *DepositRequest) (*DepositReply, error)
 	EmailGet(context.Context, *EmailGetRequest) (*EmailGetReply, error)
-	// OpenCardHandle 开卡
+	// OpenCardHandle 开卡，废弃
 	OpenCardHandle(context.Context, *OpenCardHandleRequest) (*OpenCardHandleReply, error)
+	PullAllCard(context.Context, *PullAllCardRequest) (*PullAllCardReply, error)
+	// RewardCardTwo 实体卡分红
 	RewardCardTwo(context.Context, *RewardCardTwoRequest) (*RewardCardTwoReply, error)
+	// SetUserCount 清除用户申请卡片次数，目前无用
 	SetUserCount(context.Context, *SetUserCountRequest) (*SetUserCountReply, error)
+	// SetVipThree 设置实体卡分红级别
 	SetVipThree(context.Context, *SetVipThreeRequest) (*SetVipThreeReply, error)
 	UpdateAllCard(context.Context, *UpdateAllCardRequest) (*UpdateAllCardReply, error)
 	UpdateAllCardOne(context.Context, *UpdateAllCardRequest) (*UpdateAllCardReply, error)
+	// UpdateCanVip 设置用户客户端调整分红级别虚拟卡
 	UpdateCanVip(context.Context, *UpdateCanVipRequest) (*UpdateCanVipReply, error)
+	// UpdateUserInfoTo 废弃
 	UpdateUserInfoTo(context.Context, *UpdateUserInfoToRequest) (*UpdateUserInfoToReply, error)
 }
 
@@ -89,6 +101,7 @@ func RegisterUserHTTPServer(s *http.Server, srv UserHTTPServer) {
 	r.GET("/api/admin_dhb/update_all_card_one", _User_UpdateAllCardOne0_HTTP_Handler(srv))
 	r.GET("/api/admin_dhb/all_info", _User_AllInfo0_HTTP_Handler(srv))
 	r.GET("/api/admin_dhb/email_get", _User_EmailGet0_HTTP_Handler(srv))
+	r.GET("/api/admin_dhb/pull_all_card_one", _User_PullAllCard0_HTTP_Handler(srv))
 }
 
 func _User_OpenCardHandle0_HTTP_Handler(srv UserHTTPServer) func(ctx http.Context) error {
@@ -514,6 +527,25 @@ func _User_EmailGet0_HTTP_Handler(srv UserHTTPServer) func(ctx http.Context) err
 	}
 }
 
+func _User_PullAllCard0_HTTP_Handler(srv UserHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in PullAllCardRequest
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationUserPullAllCard)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.PullAllCard(ctx, req.(*PullAllCardRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*PullAllCardReply)
+		return ctx.Result(200, reply)
+	}
+}
+
 type UserHTTPClient interface {
 	AdminCardTwoList(ctx context.Context, req *AdminCardTwoRequest, opts ...http.CallOption) (rsp *AdminCardTwoReply, err error)
 	AdminConfig(ctx context.Context, req *AdminConfigRequest, opts ...http.CallOption) (rsp *AdminConfigReply, err error)
@@ -529,6 +561,7 @@ type UserHTTPClient interface {
 	Deposit(ctx context.Context, req *DepositRequest, opts ...http.CallOption) (rsp *DepositReply, err error)
 	EmailGet(ctx context.Context, req *EmailGetRequest, opts ...http.CallOption) (rsp *EmailGetReply, err error)
 	OpenCardHandle(ctx context.Context, req *OpenCardHandleRequest, opts ...http.CallOption) (rsp *OpenCardHandleReply, err error)
+	PullAllCard(ctx context.Context, req *PullAllCardRequest, opts ...http.CallOption) (rsp *PullAllCardReply, err error)
 	RewardCardTwo(ctx context.Context, req *RewardCardTwoRequest, opts ...http.CallOption) (rsp *RewardCardTwoReply, err error)
 	SetUserCount(ctx context.Context, req *SetUserCountRequest, opts ...http.CallOption) (rsp *SetUserCountReply, err error)
 	SetVipThree(ctx context.Context, req *SetVipThreeRequest, opts ...http.CallOption) (rsp *SetVipThreeReply, err error)
@@ -720,6 +753,19 @@ func (c *UserHTTPClientImpl) OpenCardHandle(ctx context.Context, in *OpenCardHan
 	pattern := "/api/admin_dhb/open_card_handle"
 	path := binding.EncodeURL(pattern, in, true)
 	opts = append(opts, http.Operation(OperationUserOpenCardHandle))
+	opts = append(opts, http.PathTemplate(pattern))
+	err := c.cc.Invoke(ctx, "GET", path, nil, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, err
+}
+
+func (c *UserHTTPClientImpl) PullAllCard(ctx context.Context, in *PullAllCardRequest, opts ...http.CallOption) (*PullAllCardReply, error) {
+	var out PullAllCardReply
+	pattern := "/api/admin_dhb/pull_all_card_one"
+	path := binding.EncodeURL(pattern, in, true)
+	opts = append(opts, http.Operation(OperationUserPullAllCard))
 	opts = append(opts, http.PathTemplate(pattern))
 	err := c.cc.Invoke(ctx, "GET", path, nil, &out, opts...)
 	if err != nil {

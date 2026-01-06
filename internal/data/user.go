@@ -1423,6 +1423,44 @@ func (u *UserRepo) UpdateUserInfo(ctx context.Context, userId uint64, user *biz.
 	return nil
 }
 
+// GetCardByCardId z
+func (u *UserRepo) GetCardByCardId(ctx context.Context, cardId string) (*biz.Card, error) {
+	var c Card
+
+	instance := u.data.DB(ctx).Table("card").Where("card_id=?", cardId)
+
+	if err := instance.First(&c).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// 没有就返回 nil, nil，或者你习惯的 NotFound 错误
+			return nil, nil
+		}
+		return nil, errors.New(500, "CARD_ERROR", err.Error())
+	}
+
+	res := &biz.Card{
+		ID:                  c.ID,
+		CardID:              c.CardID,
+		AccountID:           c.AccountID,
+		CardholderID:        c.CardholderID,
+		BalanceID:           c.BalanceID,
+		BudgetID:            c.BudgetID,
+		ReferenceID:         c.ReferenceID,
+		UserName:            c.UserName,
+		Currency:            c.Currency,
+		Bin:                 c.Bin,
+		Status:              c.Status,
+		CardMode:            c.CardMode,
+		Label:               c.Label,
+		CardLastFour:        c.CardLastFour,
+		InterlaceCreateTime: c.InterlaceCreateTime,
+		CreatedAt:           c.CreatedAt,
+		UpdatedAt:           c.UpdatedAt,
+		UserId:              c.UserId,
+	}
+
+	return res, nil
+}
+
 // GetLatestCard 按 InterlaceCreateTime 倒序取最新一条
 func (u *UserRepo) GetLatestCard(ctx context.Context) (*biz.Card, error) {
 	var c Card
@@ -1518,7 +1556,7 @@ func (u *UserRepo) GetCardPage(ctx context.Context, b *biz.Pagination, accountId
 }
 
 // CreateCardNew 创建一条卡片记录
-func (u *UserRepo) CreateCardNew(ctx context.Context, userId, id uint64, in *biz.Card) error {
+func (u *UserRepo) CreateCardNew(ctx context.Context, userId, id uint64, in *biz.Card, isNew bool) error {
 	res := u.data.DB(ctx).Table("card_two").Where("id=?", id).
 		Updates(map[string]interface{}{
 			"status":     2,
@@ -1540,29 +1578,40 @@ func (u *UserRepo) CreateCardNew(ctx context.Context, userId, id uint64, in *biz
 		return errors.New(500, "CreateCardNew", "用户信息修改失败")
 	}
 
-	var c Card
+	if isNew {
+		var c Card
 
-	c.CardID = in.CardID
-	c.AccountID = in.AccountID
-	c.CardholderID = in.CardholderID
-	c.BalanceID = in.BalanceID
-	c.BudgetID = in.BudgetID
-	c.ReferenceID = in.ReferenceID
+		c.CardID = in.CardID
+		c.AccountID = in.AccountID
+		c.CardholderID = in.CardholderID
+		c.BalanceID = in.BalanceID
+		c.BudgetID = in.BudgetID
+		c.ReferenceID = in.ReferenceID
 
-	c.UserName = in.UserName
-	c.Currency = in.Currency
-	c.Bin = in.Bin
-	c.Status = in.Status
-	c.CardMode = in.CardMode
-	c.Label = in.Label
-	c.CardLastFour = in.CardLastFour
+		c.UserName = in.UserName
+		c.Currency = in.Currency
+		c.Bin = in.Bin
+		c.Status = in.Status
+		c.CardMode = in.CardMode
+		c.Label = in.Label
+		c.CardLastFour = in.CardLastFour
 
-	c.InterlaceCreateTime = in.InterlaceCreateTime
-	c.UserId = int64(userId)
+		c.InterlaceCreateTime = in.InterlaceCreateTime
+		c.UserId = int64(userId)
 
-	resInsert := u.data.DB(ctx).Table("card").Create(&c)
-	if resInsert.Error != nil || resInsert.RowsAffected <= 0 {
-		return errors.New(500, "CREATE_CARD_ERROR", "卡片信息创建失败")
+		resInsert := u.data.DB(ctx).Table("card").Create(&c)
+		if resInsert.Error != nil || resInsert.RowsAffected <= 0 {
+			return errors.New(500, "CREATE_CARD_ERROR", "卡片信息创建失败")
+		}
+	} else {
+		resThree := u.data.DB(ctx).Table("card").Where("card_id=?", in.CardID).
+			Updates(map[string]interface{}{
+				"user_id":    userId,
+				"updated_at": time.Now().Format("2006-01-02 15:04:05"),
+			})
+		if resThree.Error != nil || 0 >= resThree.RowsAffected {
+			return errors.New(500, "CreateCardOne", "用户信息修改失败")
+		}
 	}
 
 	return nil
@@ -1610,19 +1659,8 @@ func (u *UserRepo) UpdateCardStatus(ctx context.Context, id, userId uint64, card
 	return nil
 }
 
-// CreateCardOne 创建一条卡片记录
-func (u *UserRepo) CreateCardOne(ctx context.Context, userId uint64, in *biz.Card) error {
-	resTwo := u.data.DB(ctx).Table("user").Where("id=?", userId).
-		Updates(map[string]interface{}{
-			"card_order_id": "success",
-			"lock_card":     0,
-			"change_card":   0,
-			"updated_at":    time.Now().Format("2006-01-02 15:04:05"),
-		})
-	if resTwo.Error != nil || 0 >= resTwo.RowsAffected {
-		return errors.New(500, "CreateCardOne", "用户信息修改失败")
-	}
-
+// CreateCardOnly 创建一条卡片记录
+func (u *UserRepo) CreateCardOnly(ctx context.Context, in *biz.Card) error {
 	var c Card
 
 	c.CardID = in.CardID
@@ -1641,11 +1679,63 @@ func (u *UserRepo) CreateCardOne(ctx context.Context, userId uint64, in *biz.Car
 	c.CardLastFour = in.CardLastFour
 
 	c.InterlaceCreateTime = in.InterlaceCreateTime
-	c.UserId = int64(userId)
+	c.UserId = int64(0)
 
 	resInsert := u.data.DB(ctx).Table("card").Create(&c)
 	if resInsert.Error != nil || resInsert.RowsAffected <= 0 {
 		return errors.New(500, "CREATE_CARD_ERROR", "卡片信息创建失败")
+	}
+
+	return nil
+}
+
+// CreateCardOne 创建一条卡片记录
+func (u *UserRepo) CreateCardOne(ctx context.Context, userId uint64, in *biz.Card, isNew bool) error {
+	resTwo := u.data.DB(ctx).Table("user").Where("id=?", userId).
+		Updates(map[string]interface{}{
+			"card_order_id": "success",
+			"lock_card":     0,
+			"change_card":   0,
+			"updated_at":    time.Now().Format("2006-01-02 15:04:05"),
+		})
+	if resTwo.Error != nil || 0 >= resTwo.RowsAffected {
+		return errors.New(500, "CreateCardOne", "用户信息修改失败")
+	}
+
+	if isNew {
+		var c Card
+
+		c.CardID = in.CardID
+		c.AccountID = in.AccountID
+		c.CardholderID = in.CardholderID
+		c.BalanceID = in.BalanceID
+		c.BudgetID = in.BudgetID
+		c.ReferenceID = in.ReferenceID
+
+		c.UserName = in.UserName
+		c.Currency = in.Currency
+		c.Bin = in.Bin
+		c.Status = in.Status
+		c.CardMode = in.CardMode
+		c.Label = in.Label
+		c.CardLastFour = in.CardLastFour
+
+		c.InterlaceCreateTime = in.InterlaceCreateTime
+		c.UserId = int64(userId)
+
+		resInsert := u.data.DB(ctx).Table("card").Create(&c)
+		if resInsert.Error != nil || resInsert.RowsAffected <= 0 {
+			return errors.New(500, "CREATE_CARD_ERROR", "卡片信息创建失败")
+		}
+	} else {
+		resThree := u.data.DB(ctx).Table("card").Where("card_id=?", in.CardID).
+			Updates(map[string]interface{}{
+				"user_id":    userId,
+				"updated_at": time.Now().Format("2006-01-02 15:04:05"),
+			})
+		if resThree.Error != nil || 0 >= resThree.RowsAffected {
+			return errors.New(500, "CreateCardOne", "用户信息修改失败")
+		}
 	}
 
 	return nil
