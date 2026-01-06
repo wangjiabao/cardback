@@ -1855,7 +1855,7 @@ func (uuc *UserUseCase) AutoUpdateAllCard(ctx context.Context, req *pb.UpdateAll
 			}
 		}
 
-		fmt.Println("自动开卡，划转：", cardAmountF, cardAmount, "完成")
+		fmt.Println("自动开卡，划转：", cardAmountF, cardAmount, v, card, "完成")
 		if errFour := uuc.repo.UpdateUserDone(ctx, v.ID, card.CardID, cardAmountF); errFour != nil {
 			fmt.Println("AutoUpdateAllCard", "err =", err)
 			// 这条失败就算了，不影响其它
@@ -3125,8 +3125,8 @@ func InterlaceCreateCardholderMOR(
 	email string,
 	firstName string,
 	lastName string,
-	dob string,         // YYYY-MM-DD
-	gender string,      // "M" / "F"
+	dob string, // YYYY-MM-DD
+	gender string, // "M" / "F"
 	nationality string, // ISO2, e.g. "CN"
 	nationalId string,
 	idType string, // "CN-RIC" / "PASSPORT" / ...
