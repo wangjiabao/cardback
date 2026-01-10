@@ -1826,14 +1826,15 @@ func (uuc *UserUseCase) AutoUpdateAllCard(ctx context.Context, req *pb.UpdateAll
 		// 划出余额
 		cardAmountF, _ = strconv.ParseFloat(cardAmount, 10)
 		if 0.001 <= cardAmountF {
-			fmt.Println("自动开卡，划转：", cardAmountF, cardAmount)
+			tmpCaS := strconv.FormatFloat(cardAmountF, 'f', -1, 64)
+			fmt.Println("自动开卡，划转：", cardAmountF, cardAmount, tmpCaS)
 
 			// 划转出去
 			data, errThree := InterlaceCardTransferOut(ctx, &InterlaceCardTransferOutReq{
 				AccountId:           interlaceAccountId,
 				CardId:              card.CardID,
 				ClientTransactionId: fmt.Sprintf("out-%d", time.Now().UnixNano()),
-				Amount:              cardAmount, // 字符串
+				Amount:              tmpCaS, // 字符串
 			})
 			if nil == data || errThree != nil {
 				fmt.Println("InterlaceCardTransferOut error:", err)
@@ -3125,8 +3126,8 @@ func InterlaceCreateCardholderMOR(
 	email string,
 	firstName string,
 	lastName string,
-	dob string, // YYYY-MM-DD
-	gender string, // "M" / "F"
+	dob string,         // YYYY-MM-DD
+	gender string,      // "M" / "F"
 	nationality string, // ISO2, e.g. "CN"
 	nationalId string,
 	idType string, // "CN-RIC" / "PASSPORT" / ...
