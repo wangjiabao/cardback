@@ -1286,7 +1286,16 @@ func (uuc *UserUseCase) AdminUserBindTwo(ctx context.Context, req *pb.AdminUserB
 		return &pb.AdminUserBindTwoReply{}, err
 	}
 
-	if errThree := uuc.repo.UpdateCardStatus(ctx, req.SendBody.Id, cardTwo.UserId, req.SendBody.CardId, req.SendBody.CarNum, req.SendBody.Amount); errThree != nil {
+	var (
+		user *User
+	)
+
+	user, err = uuc.repo.GetUserById(cardTwo.UserId)
+	if nil == user || nil != err {
+		return &pb.AdminUserBindTwoReply{}, err
+	}
+
+	if errThree := uuc.repo.UpdateCardStatus(ctx, req.SendBody.Id, cardTwo.UserId, req.SendBody.CardId, user.CardNumberRelTwo, req.SendBody.Amount); errThree != nil {
 		fmt.Println("AdminUserBindTwo", "err =", err)
 		// 这条失败就算了，不影响其它
 		return &pb.AdminUserBindTwoReply{}, err
@@ -3126,8 +3135,8 @@ func InterlaceCreateCardholderMOR(
 	email string,
 	firstName string,
 	lastName string,
-	dob string,         // YYYY-MM-DD
-	gender string,      // "M" / "F"
+	dob string, // YYYY-MM-DD
+	gender string, // "M" / "F"
 	nationality string, // ISO2, e.g. "CN"
 	nationalId string,
 	idType string, // "CN-RIC" / "PASSPORT" / ...

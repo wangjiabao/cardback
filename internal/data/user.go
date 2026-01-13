@@ -330,19 +330,20 @@ func (u *UserRepo) GetUserById(userId uint64) (*biz.User, error) {
 	}
 
 	return &biz.User{
-		CardAmount:    user.CardAmount,
-		MyTotalAmount: user.MyTotalAmount,
-		AmountTwo:     user.AmountTwo,
-		IsDelete:      user.IsDelete,
-		Vip:           user.Vip,
-		ID:            user.ID,
-		Address:       user.Address,
-		Card:          user.Card,
-		Amount:        user.Amount,
-		CardNumber:    user.CardNumber,
-		CardOrderId:   user.CardOrderId,
-		CreatedAt:     user.CreatedAt,
-		UpdatedAt:     user.UpdatedAt,
+		CardAmount:       user.CardAmount,
+		MyTotalAmount:    user.MyTotalAmount,
+		AmountTwo:        user.AmountTwo,
+		IsDelete:         user.IsDelete,
+		Vip:              user.Vip,
+		ID:               user.ID,
+		Address:          user.Address,
+		Card:             user.Card,
+		Amount:           user.Amount,
+		CardNumber:       user.CardNumber,
+		CardOrderId:      user.CardOrderId,
+		CreatedAt:        user.CreatedAt,
+		UpdatedAt:        user.UpdatedAt,
+		CardNumberRelTwo: user.CardNumberRelTwo,
 	}, nil
 }
 
