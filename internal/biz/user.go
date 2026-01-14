@@ -1353,8 +1353,10 @@ func (uuc *UserUseCase) AdminCardTwoList(ctx context.Context, req *pb.AdminCardT
 
 	for _, vUsers := range cards {
 		addressTmp := ""
+		cardNumberRelTwo := ""
 		if _, ok := usersMap[vUsers.UserId]; ok {
 			addressTmp = usersMap[vUsers.UserId].Address
+			cardNumberRelTwo = usersMap[vUsers.UserId].CardNumberRelTwo
 		}
 
 		res.Users = append(res.Users, &pb.AdminCardTwoReply_EntityCardUser{
@@ -1378,6 +1380,7 @@ func (uuc *UserUseCase) AdminCardTwoList(ctx context.Context, req *pb.AdminCardT
 			Status:           vUsers.Status,
 			IdCard:           vUsers.IdCard,
 			Gender:           vUsers.Gender,
+			CardNumberRelTwo: cardNumberRelTwo,
 		})
 	}
 

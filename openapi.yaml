@@ -587,6 +587,8 @@ components:
                     type: string
                 gender:
                     type: string
+                cardNumberRelTwo:
+                    type: string
             description: 单个用户实体卡信息
         AdminConfigReply:
             type: object

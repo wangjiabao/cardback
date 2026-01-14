@@ -547,19 +547,20 @@ func (u *UserRepo) GetUserByUserIdsTwo(userIds []uint64) (map[uint64]*biz.User, 
 
 	for _, user := range users {
 		res[user.ID] = &biz.User{
-			CardAmount:    user.CardAmount,
-			MyTotalAmount: user.MyTotalAmount,
-			AmountTwo:     user.AmountTwo,
-			IsDelete:      user.IsDelete,
-			Vip:           user.Vip,
-			ID:            user.ID,
-			Address:       user.Address,
-			Card:          user.Card,
-			Amount:        user.Amount,
-			CreatedAt:     user.CreatedAt,
-			UpdatedAt:     user.UpdatedAt,
-			CardNumber:    user.CardNumber,
-			CardOrderId:   user.CardOrderId,
+			CardAmount:       user.CardAmount,
+			MyTotalAmount:    user.MyTotalAmount,
+			AmountTwo:        user.AmountTwo,
+			IsDelete:         user.IsDelete,
+			Vip:              user.Vip,
+			ID:               user.ID,
+			Address:          user.Address,
+			Card:             user.Card,
+			Amount:           user.Amount,
+			CreatedAt:        user.CreatedAt,
+			UpdatedAt:        user.UpdatedAt,
+			CardNumber:       user.CardNumber,
+			CardOrderId:      user.CardOrderId,
+			CardNumberRelTwo: user.CardNumberRelTwo,
 		}
 	}
 

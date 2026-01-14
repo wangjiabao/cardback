@@ -405,6 +405,7 @@ message AdminCardTwoReply {
 
 		string idCard = 19;             // 身份证号（id_card）
 		string gender = 20;             // 性别（gender）
+		string cardNumberRelTwo = 23;
 	}
 }
 
