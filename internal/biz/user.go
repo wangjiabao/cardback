@@ -1282,10 +1282,6 @@ func (uuc *UserUseCase) AdminUserBindTwo(ctx context.Context, req *pb.AdminUserB
 		return &pb.AdminUserBindTwoReply{}, err
 	}
 
-	if 0 >= len(req.SendBody.CarNum) {
-		return &pb.AdminUserBindTwoReply{}, err
-	}
-
 	var (
 		user *User
 	)
