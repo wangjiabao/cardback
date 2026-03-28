@@ -1887,7 +1887,12 @@ func (u *UserRepo) CreateCardOrder(ctx context.Context, in *biz.CardOrder) error
 	c.Last = in.Last
 	c.Card = in.Card
 	c.Code = in.Code
-	c.Time = in.Time
+
+	if nil != in.Time {
+		c.Time = in.Time
+	} else {
+		c.Time = &time.Time{}
+	}
 
 	resInsert := u.data.DB(ctx).Table("card_code").Create(&c)
 	if resInsert.Error != nil || resInsert.RowsAffected <= 0 {
