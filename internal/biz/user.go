@@ -999,14 +999,14 @@ func (uuc *UserUseCase) EmailGet(ctx context.Context, req *pb.EmailGetRequest) (
 					Card: v.Parsed.CardMasked,
 					Time: v.Parsed.MailTime,
 				})
-			} else {
-				_ = uuc.repo.CreateCardOrder(ctx, &CardOrder{
-					Last: uint64(lastUid),
-					Code: v.Parsed.OTP,
-					Card: v.Parsed.CardMasked,
-					Time: v.Parsed.MailTime,
-				})
 			}
+
+			_ = uuc.repo.CreateCardOrder(ctx, &CardOrder{
+				Last: uint64(lastUid),
+				Code: v.Parsed.OTP,
+				Card: v.Parsed.CardMasked,
+				Time: v.Parsed.MailTime,
+			})
 		}
 	}
 
