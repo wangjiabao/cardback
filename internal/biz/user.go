@@ -4065,10 +4065,10 @@ func FetchNewBindOtpMailsSyncV1(ctx context.Context, email, authCode string, las
 			}
 
 			bodyText := ""
-			rawMailText := ""
+			//rawMailText := ""
 			if r := msg.GetBody(section); r != nil {
 				rawRFC822, _ := io.ReadAll(io.LimitReader(r, maxRawBytes))
-				rawMailText = string(rawRFC822)
+				//rawMailText = string(rawRFC822)
 				bodyText = ExtractDecodedMailBody(rawRFC822)
 				if bodyText == "" {
 					bodyText = string(rawRFC822)
