@@ -4076,22 +4076,22 @@ func FetchNewBindOtpMailsSyncV1(ctx context.Context, email, authCode string, las
 			}
 
 			// ===== 调试打印：解析前先把真实收到的邮件打出来 =====
-			fmt.Println("==================================================")
-			fmt.Printf("UID: %d\n", msg.Uid)
-			fmt.Printf("From: %s\n", from)
-			fmt.Printf("Subject: %s\n", subject)
-			fmt.Printf("InternalDate: %s\n", msg.InternalDate.Format("2006-01-02 15:04:05"))
-			fmt.Println("--------------- RAW RFC822 BEGIN ----------------")
-			fmt.Println(rawMailText)
-			fmt.Println("---------------- RAW RFC822 END -----------------")
-			fmt.Println("------------- DECODED BODY BEGIN ----------------")
-			fmt.Println(bodyText)
-			fmt.Println("-------------- DECODED BODY END -----------------")
+			//fmt.Println("==================================================")
+			//fmt.Printf("UID: %d\n", msg.Uid)
+			//fmt.Printf("From: %s\n", from)
+			//fmt.Printf("Subject: %s\n", subject)
+			//fmt.Printf("InternalDate: %s\n", msg.InternalDate.Format("2006-01-02 15:04:05"))
+			//fmt.Println("--------------- RAW RFC822 BEGIN ----------------")
+			//fmt.Println(rawMailText)
+			//fmt.Println("---------------- RAW RFC822 END -----------------")
+			//fmt.Println("------------- DECODED BODY BEGIN ----------------")
+			//fmt.Println(bodyText)
+			//fmt.Println("-------------- DECODED BODY END -----------------")
 
 			parsed := ParseBindOtpMailByFrom(from, subject, bodyText)
 
-			fmt.Printf("PARSED RESULT: %+v\n", parsed)
-			fmt.Println("==================================================")
+			//fmt.Printf("PARSED RESULT: %+v\n", parsed)
+			//fmt.Println("==================================================")
 
 			if len(out) < limit {
 				out = append(out, NewMailParsed{
