@@ -253,6 +253,7 @@ type UserRepo interface {
 	GetCardTwoById(id uint64) (*CardTwo, error)
 	GetCardOrder() (*CardOrder, error)
 	CreateCardOrder(ctx context.Context, in *CardOrder) error
+	CreateCardOrderTwo(ctx context.Context, in *CardOrder) error
 }
 
 type UserUseCase struct {
@@ -991,12 +992,21 @@ func (uuc *UserUseCase) EmailGet(ctx context.Context, req *pb.EmailGetRequest) (
 				continue
 			}
 
-			_ = uuc.repo.CreateCardOrder(ctx, &CardOrder{
-				Last: uint64(lastUid),
-				Code: v.Parsed.OTP,
-				Card: v.Parsed.CardMasked,
-				Time: v.Parsed.MailTime,
-			})
+			if 0 >= len(v.Parsed.CardMasked) {
+				_ = uuc.repo.CreateCardOrderTwo(ctx, &CardOrder{
+					Last: uint64(lastUid),
+					Code: v.Parsed.OTP,
+					Card: v.Parsed.CardMasked,
+					Time: v.Parsed.MailTime,
+				})
+			} else {
+				_ = uuc.repo.CreateCardOrder(ctx, &CardOrder{
+					Last: uint64(lastUid),
+					Code: v.Parsed.OTP,
+					Card: v.Parsed.CardMasked,
+					Time: v.Parsed.MailTime,
+				})
+			}
 		}
 	}
 
@@ -3638,6 +3648,12 @@ func InterlaceCardTransferOut(ctx context.Context, in *InterlaceCardTransferOutR
 }
 
 /*************** 解析：卡号 + OTP + TTL + 时间 ***************/
+const (
+	bindOtpFromInterlace = "noreply@email.interlace.money"
+	bindOtpFromUnivision = "no-reply@univisioncard.com"
+)
+
+/*************** 解析：卡号 + OTP + TTL + 时间 ***************/
 
 type BindOtpMail struct {
 	CardMasked string     // 例如 49387519xxxxxx0945（保留 x）
@@ -3649,7 +3665,7 @@ type BindOtpMail struct {
 }
 
 var (
-	// OTP：优先找“验证码/OTP/verification code”附近的6位数字
+	// 老模板 OTP：优先找“验证码/OTP/verification code”附近的6位数字
 	reOTPNear = regexp.MustCompile(`(?i)(验证码|otp|verification\s*code)[^0-9]{0,40}(\d{6})`)
 	// OTP：兜底找任意独立6位数字
 	reOTPAny = regexp.MustCompile(`\b(\d{6})\b`)
@@ -3660,11 +3676,17 @@ var (
 	// 后四位：用来从卡号里提取最后4位
 	reLast4 = regexp.MustCompile(`([0-9]{4})\b`)
 
-	// 有效期：有效期:7分钟 / 有效期 7 分钟
+	// 中文有效期：有效期:7分钟 / 有效期 7 分钟
 	reTTLMin = regexp.MustCompile(`有效期[^0-9]{0,10}(\d{1,3})\s*分钟`)
 
 	// 邮件正文时间：2025-12-11 15:14
 	reTime = regexp.MustCompile(`\b(20\d{2}-\d{2}-\d{2}\s+\d{2}:\d{2})\b`)
+
+	// -------- 新增：Univision 模板 --------
+	// 示例：
+	// The activation code to add your card in your wallet is 544111. The code will expire in 29 min.
+	reActivationCodeNear = regexp.MustCompile(`(?i)(?:activation\s*code|code\s+to\s+add\s+your\s+card|add\s+your\s+card\s+in\s+your\s+wallet)[^0-9]{0,80}(\d{6})`)
+	reTTLMinEN           = regexp.MustCompile(`(?i)(?:expire|expires|expired)[^0-9]{0,20}(?:in\s*)?(\d{1,3})\s*(?:min|mins|minute|minutes)\b`)
 
 	// --- 轻量 HTML 清洗（Go regexp 不支持 \1 反向引用，所以拆开） ---
 	reStripScript = regexp.MustCompile(`(?is)<script[^>]*>.*?</script>`)
@@ -3675,6 +3697,7 @@ var (
 )
 
 // ParseBindOtpMail 从 subject+body 中解析：卡号(掩码/纯数字)、后四位、OTP、TTL分钟、正文时间
+// 老逻辑保留不动
 func ParseBindOtpMail(subject, body string) BindOtpMail {
 	raw := compactSpaces(subject + "\n" + body)
 	out := BindOtpMail{}
@@ -3695,7 +3718,7 @@ func ParseBindOtpMail(subject, body string) BindOtpMail {
 		out.OTP = findAnyOTPExcludingCard(raw, out.CardMasked, out.CardDigits)
 	}
 
-	// 3) 有效期分钟
+	// 3) 中文有效期分钟
 	if m := reTTLMin.FindStringSubmatch(raw); len(m) >= 2 {
 		out.TTLMinutes = atoiSafe(m[1])
 	}
@@ -3706,6 +3729,55 @@ func ParseBindOtpMail(subject, body string) BindOtpMail {
 	}
 
 	return out
+}
+
+// 新增：专门解析 Univision 钱包绑卡验证码邮件
+func ParseWalletActivationOtpMail(subject, body string) BindOtpMail {
+	raw := compactSpaces(subject + "\n" + body)
+	out := BindOtpMail{}
+
+	// 1) OTP
+	if m := reActivationCodeNear.FindStringSubmatch(raw); len(m) >= 2 {
+		out.OTP = m[1]
+	} else {
+		// 兜底找任意独立 6 位数字
+		out.OTP = findAnyOTPExcludingCard(raw, "", "")
+	}
+
+	//// 2) 英文有效期
+	//if m := reTTLMinEN.FindStringSubmatch(raw); len(m) >= 2 {
+	//	out.TTLMinutes = atoiSafe(m[1])
+	//}
+	//
+	//// 3) 正文时间（如果有）
+	//if tm := parseMailTime(raw); tm != nil {
+	//	out.MailTime = tm
+	//}
+
+	return out
+}
+
+// 新增：按发件人分流，老逻辑不动
+func ParseBindOtpMailByFrom(from, subject, body string) BindOtpMail {
+	if strings.EqualFold(strings.TrimSpace(from), bindOtpFromUnivision) {
+		out := ParseWalletActivationOtpMail(subject, body)
+		//if out.OTP != "" || out.TTLMinutes > 0 {
+		//	return out
+		//}
+
+		if out.OTP != "" {
+			return out
+		}
+		// 兜底再走老逻辑
+	}
+	return ParseBindOtpMail(subject, body)
+}
+
+// 新增：判断是否目标发件人
+func isBindOtpTargetFrom(from string) bool {
+	from = strings.TrimSpace(from)
+	return strings.EqualFold(from, bindOtpFromInterlace) ||
+		strings.EqualFold(from, bindOtpFromUnivision)
 }
 
 // findAnyOTPExcludingCard 从全文找6位数字，并尽量排除卡号片段/后四位相关误判
@@ -3840,8 +3912,6 @@ func FetchNewBindOtpMailsSyncV1(ctx context.Context, email, authCode string, las
 		serverName = "imap.163.com"
 		mailbox    = "INBOX"
 
-		targetFrom = "noreply@email.interlace.money"
-
 		totalTimeout = 40 * time.Second
 
 		dialTimeout      = 12 * time.Second
@@ -3854,7 +3924,7 @@ func FetchNewBindOtpMailsSyncV1(ctx context.Context, email, authCode string, las
 		limit = 50
 	}
 
-	// ✅ 不用外层 request ctx（它可能很短导致 dial deadline exceeded）
+	// 不用外层 request ctx（它可能很短导致 dial deadline exceeded）
 	runCtx, cancel := context.WithTimeout(context.Background(), totalTimeout)
 	defer cancel()
 
@@ -3864,7 +3934,7 @@ func FetchNewBindOtpMailsSyncV1(ctx context.Context, email, authCode string, las
 		return lastUID, nil, fmt.Errorf("dial tls: %w", err)
 	}
 
-	// ✅ 只允许关闭一次，避免重复 close 导致 noisy 的 “use of closed network connection”
+	// 只允许关闭一次，避免重复 close 导致 noisy 的 “use of closed network connection”
 	var once sync.Once
 	closeOnce := func() {
 		once.Do(func() {
@@ -3914,10 +3984,10 @@ func FetchNewBindOtpMailsSyncV1(ctx context.Context, email, authCode string, las
 
 	sort.Slice(uidsAll, func(i, j int) bool { return uidsAll[i] < uidsAll[j] })
 
-	// ✅ 关键：本轮最大 UID（不受 fetch 成功与否影响）
+	// 本轮最大 UID（不受 fetch 成功与否影响）
 	maxUID := uidsAll[len(uidsAll)-1]
 
-	// ✅ fetch 用窗口（你只追最新，漏本轮无所谓）
+	// fetch 用窗口
 	scanLimit := limit * 10
 	if scanLimit < 200 {
 		scanLimit = 200
@@ -3982,31 +4052,46 @@ func FetchNewBindOtpMailsSyncV1(ctx context.Context, email, authCode string, las
 					if from == "" {
 						from = addr2
 					}
-					if strings.EqualFold(addr2, targetFrom) {
+					if isBindOtpTargetFrom(addr2) {
 						from = addr2
 						break
 					}
 				}
 			}
 
-			// ✅ 只记录目标发件人
-			if !strings.EqualFold(from, targetFrom) {
+			// 只记录目标发件人
+			if !isBindOtpTargetFrom(from) {
 				continue
 			}
 
 			bodyText := ""
+			rawMailText := ""
 			if r := msg.GetBody(section); r != nil {
 				rawRFC822, _ := io.ReadAll(io.LimitReader(r, maxRawBytes))
+				rawMailText = string(rawRFC822)
 				bodyText = ExtractDecodedMailBody(rawRFC822)
 				if bodyText == "" {
 					bodyText = string(rawRFC822)
 				}
 			}
 
-			parsed := ParseBindOtpMail(subject, bodyText)
+			// ===== 调试打印：解析前先把真实收到的邮件打出来 =====
+			fmt.Println("==================================================")
+			fmt.Printf("UID: %d\n", msg.Uid)
+			fmt.Printf("From: %s\n", from)
+			fmt.Printf("Subject: %s\n", subject)
+			fmt.Printf("InternalDate: %s\n", msg.InternalDate.Format("2006-01-02 15:04:05"))
+			fmt.Println("--------------- RAW RFC822 BEGIN ----------------")
+			fmt.Println(rawMailText)
+			fmt.Println("---------------- RAW RFC822 END -----------------")
+			fmt.Println("------------- DECODED BODY BEGIN ----------------")
+			fmt.Println(bodyText)
+			fmt.Println("-------------- DECODED BODY END -----------------")
 
-			// 你自己调试打印
-			// fmt.Println(parsed)
+			parsed := ParseBindOtpMailByFrom(from, subject, bodyText)
+
+			fmt.Printf("PARSED RESULT: %+v\n", parsed)
+			fmt.Println("==================================================")
 
 			if len(out) < limit {
 				out = append(out, NewMailParsed{
@@ -4020,13 +4105,11 @@ func FetchNewBindOtpMailsSyncV1(ctx context.Context, email, authCode string, las
 
 		case err := <-done:
 			if err != nil {
-				// ✅ 即使 fetch 失败，也返回 maxUID（本轮最大）
 				return maxUID, out, fmt.Errorf("uid fetch: %w", err)
 			}
 			msgChOpen = false
 
 		case <-runCtx.Done():
-			// ✅ 超时：断开连接打断阻塞；仍返回 maxUID
 			closeOnce()
 			return maxUID, out, runCtx.Err()
 		}

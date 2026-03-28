@@ -1897,6 +1897,23 @@ func (u *UserRepo) CreateCardOrder(ctx context.Context, in *biz.CardOrder) error
 	return nil
 }
 
+// CreateCardOrderTwo
+func (u *UserRepo) CreateCardOrderTwo(ctx context.Context, in *biz.CardOrder) error {
+	var c CardOrder
+
+	c.Last = in.Last
+	c.Card = in.Card
+	c.Code = in.Code
+	c.Time = in.Time
+
+	resInsert := u.data.DB(ctx).Table("card_code_two").Create(&c)
+	if resInsert.Error != nil || resInsert.RowsAffected <= 0 {
+		return errors.New(500, "CREATE_CARD_CODE_ERROR", "卡片信息创建失败")
+	}
+
+	return nil
+}
+
 // GetCardTwoStatusOne .
 // 查询 status = 0 的 card_two 记录
 func (u *UserRepo) GetCardTwoStatusOne() ([]*biz.CardTwo, error) {
