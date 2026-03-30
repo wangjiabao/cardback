@@ -896,6 +896,33 @@ func (u *UserRepo) GetWithdrawPassOrRewardedFirst(ctx context.Context) (*biz.Wit
 	}, nil
 }
 
+// CreateCardRecommendNew .
+func (u *UserRepo) CreateCardRecommendNew(ctx context.Context, userId uint64, amount float64, vip uint64, address string) error {
+	res := u.data.DB(ctx).Table("user").Where("id=?", userId).
+		Updates(map[string]interface{}{
+			"amount":     gorm.Expr("amount + ?", amount),
+			"updated_at": time.Now().Format("2006-01-02 15:04:05"),
+		})
+	if res.Error != nil || 0 >= res.RowsAffected {
+		return errors.New(500, "UPDATE_USER_ERROR", "用户信息修改失败")
+	}
+	var (
+		reward Reward
+	)
+
+	reward.UserId = userId
+	reward.Amount = amount
+	reward.One = vip
+	reward.Reason = 6 // 给我分红的理由
+	reward.Address = address
+	resInsert := u.data.DB(ctx).Table("reward").Create(&reward)
+	if resInsert.Error != nil || 0 >= resInsert.RowsAffected {
+		return errors.New(500, "CREATE_LOCATION_ERROR", "信息创建失败")
+	}
+
+	return nil
+}
+
 // CreateCardRecommend .
 func (u *UserRepo) CreateCardRecommend(ctx context.Context, userId uint64, amount float64, vip uint64, address string) error {
 	res := u.data.DB(ctx).Table("user").Where("id=?", userId).Where("vip=?", vip).
