@@ -1937,10 +1937,6 @@ func (uuc *UserUseCase) AutoUpdateAllCard(ctx context.Context, req *pb.UpdateAll
 
 		if tmpNew {
 			totalTmp := len(tmpRecommendUserIds) - 1
-			if 4 < totalTmp {
-				totalTmp = 4
-			}
-
 			tmp := uint64(0)
 			for i := totalTmp; i >= 0; i-- {
 				tmp++
@@ -2235,10 +2231,6 @@ func (uuc *UserUseCase) UpdateAllCardTwo(ctx context.Context, req *pb.UpdateAllC
 
 			if tmpNew {
 				totalTmp := len(tmpRecommendUserIds) - 1
-				if 4 < totalTmp {
-					totalTmp = 4
-				}
-
 				tmp := uint64(0)
 				for i := totalTmp; i >= 0; i-- {
 					tmp++
@@ -3320,8 +3312,8 @@ func InterlaceCreateCardholderMOR(
 	email string,
 	firstName string,
 	lastName string,
-	dob string,         // YYYY-MM-DD
-	gender string,      // "M" / "F"
+	dob string, // YYYY-MM-DD
+	gender string, // "M" / "F"
 	nationality string, // ISO2, e.g. "CN"
 	nationalId string,
 	idType string, // "CN-RIC" / "PASSPORT" / ...
