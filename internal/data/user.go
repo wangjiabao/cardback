@@ -952,7 +952,7 @@ func (u *UserRepo) CreateCardRecommend(ctx context.Context, userId uint64, amoun
 
 // CreateCardRecommendTwo .
 func (u *UserRepo) CreateCardRecommendTwo(ctx context.Context, userId uint64, amount float64, vip uint64, address string) error {
-	res := u.data.DB(ctx).Table("user").Where("id=?", userId).Where("vip=?", vip).
+	res := u.data.DB(ctx).Table("user").Where("id=?", userId).
 		Updates(map[string]interface{}{
 			"amount":     gorm.Expr("amount + ?", amount),
 			"updated_at": time.Now().Format("2006-01-02 15:04:05"),
