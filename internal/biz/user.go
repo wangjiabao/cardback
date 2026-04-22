@@ -714,26 +714,30 @@ func (uuc *UserUseCase) CardTwoStatusHandle(ctx context.Context) error {
 		vipThreeOne   float64
 		vipThreeFour  float64
 		vipThreeFive  float64
+		cardTwo       uint64
 	)
 
 	// 配置
-	configs, err = uuc.repo.GetConfigByKeys("recommend_one", "recommend_two", "recommend_three", "recommend_four", "recommend_five")
+	configs, err = uuc.repo.GetConfigByKeys("card_two", "new_vip_three_one", "new_vip_three_two", "new_vip_three_three", "new_vip_three_four", "new_vip_three_five")
 	if nil != configs {
 		for _, vConfig := range configs {
-			if "recommend_three" == vConfig.KeyName {
+			if "new_vip_three_three" == vConfig.KeyName {
 				vipThreeThree, _ = strconv.ParseFloat(vConfig.Value, 10)
 			}
-			if "recommend_two" == vConfig.KeyName {
+			if "new_vip_three_two" == vConfig.KeyName {
 				vipThreeTwo, _ = strconv.ParseFloat(vConfig.Value, 10)
 			}
-			if "recommend_one" == vConfig.KeyName {
+			if "new_vip_three_one" == vConfig.KeyName {
 				vipThreeOne, _ = strconv.ParseFloat(vConfig.Value, 10)
 			}
-			if "recommend_four" == vConfig.KeyName {
+			if "new_vip_three_four" == vConfig.KeyName {
 				vipThreeFour, _ = strconv.ParseFloat(vConfig.Value, 10)
 			}
-			if "recommend_five" == vConfig.KeyName {
+			if "new_vip_three_five" == vConfig.KeyName {
 				vipThreeFive, _ = strconv.ParseFloat(vConfig.Value, 10)
+			}
+			if "card_two" == vConfig.KeyName {
+				cardTwo, _ = strconv.ParseUint(vConfig.Value, 10, 64)
 			}
 		}
 	}
@@ -814,7 +818,7 @@ func (uuc *UserUseCase) CardTwoStatusHandle(ctx context.Context) error {
 				continue
 			}
 
-			tmpAmount := float64(10)
+			tmpAmount := float64(cardTwo)
 			if 1 == tmp {
 				tmpAmount *= vipThreeOne
 			} else if 2 == tmp {
