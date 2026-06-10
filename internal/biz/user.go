@@ -3924,46 +3924,46 @@ func ParseBindOtpMail(subject, body string) BindOtpMail {
 	raw := compactSpaces(subject + "\n" + body)
 	out := BindOtpMail{}
 
-	fmt.Println("================================================")
-	fmt.Println("raw:", raw)
+	//fmt.Println("================================================")
+	//fmt.Println("raw:", raw)
 
 	// 1) 卡号
 	if m := reCardMasked.FindStringSubmatch(raw); len(m) >= 2 {
 
-		fmt.Println("命中 reCardMasked:", m[1])
+		//fmt.Println("命中 reCardMasked:", m[1])
 
 		out.CardMasked = normalizeMask(m[1])
 		out.CardLast4 = extractLast4(out.CardMasked)
 
 	} else if m := reCardEnding.FindStringSubmatch(raw); len(m) >= 2 {
 
-		fmt.Println("命中 reCardEnding:", m[1])
+		//fmt.Println("命中 reCardEnding:", m[1])
 
 		out.CardMasked = normalizeMask(m[1])
 		out.CardLast4 = extractLast4(out.CardMasked)
 
 	} else if m := reCardDigits.FindStringSubmatch(raw); len(m) >= 2 {
 
-		fmt.Println("命中 reCardDigits:", m[1])
+		//fmt.Println("命中 reCardDigits:", m[1])
 
 		out.CardDigits = m[1]
 		out.CardLast4 = extractLast4(out.CardDigits)
 
 	} else {
 
-		fmt.Println("卡号未命中")
+		//fmt.Println("卡号未命中")
 	}
 
 	// 2) OTP
 	if m := reVerificationCode.FindStringSubmatch(raw); len(m) >= 2 {
 
-		fmt.Println("命中 reVerificationCode:", m[1])
+		//fmt.Println("命中 reVerificationCode:", m[1])
 
 		out.OTP = m[1]
 
 	} else if m := reOTPNear.FindStringSubmatch(raw); len(m) >= 3 {
 
-		fmt.Println("命中 reOTPNear:", m[2])
+		//fmt.Println("命中 reOTPNear:", m[2])
 
 		out.OTP = m[2]
 
@@ -3971,46 +3971,46 @@ func ParseBindOtpMail(subject, body string) BindOtpMail {
 
 		out.OTP = findAnyOTPExcludingCard(raw, out.CardMasked, out.CardDigits)
 
-		fmt.Println("命中 findAnyOTPExcludingCard:", out.OTP)
+		//fmt.Println("命中 findAnyOTPExcludingCard:", out.OTP)
 	}
 
 	// 3) TTL
 	if m := reTTLMin.FindStringSubmatch(raw); len(m) >= 2 {
 
-		fmt.Println("命中 reTTLMin:", m[1])
+		//fmt.Println("命中 reTTLMin:", m[1])
 
 		out.TTLMinutes = atoiSafe(m[1])
 
 	} else if m := reTTLMinEN.FindStringSubmatch(raw); len(m) >= 2 {
 
-		fmt.Println("命中 reTTLMinEN:", m[1])
+		//fmt.Println("命中 reTTLMinEN:", m[1])
 
 		out.TTLMinutes = atoiSafe(m[1])
 
 	} else if m := reCodeExpiresEN.FindStringSubmatch(raw); len(m) >= 2 {
 
-		fmt.Println("命中 reCodeExpiresEN:", m[1])
+		//fmt.Println("命中 reCodeExpiresEN:", m[1])
 
 		out.TTLMinutes = atoiSafe(m[1])
 
 	} else {
 
-		fmt.Println("TTL未命中")
+		//fmt.Println("TTL未命中")
 	}
 
 	// 4) 时间
 	if tm := parseMailTime(raw); tm != nil {
 
-		fmt.Println("命中 MailTime:", tm.Format("2006-01-02 15:04"))
+		//fmt.Println("命中 MailTime:", tm.Format("2006-01-02 15:04"))
 
 		out.MailTime = tm
 
 	} else {
 
-		fmt.Println("时间未命中")
+		//fmt.Println("时间未命中")
 	}
 
-	fmt.Printf("最终结果: %+v\n", out)
+	//fmt.Printf("最终结果: %+v\n", out)
 
 	return out
 }
