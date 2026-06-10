@@ -3873,7 +3873,7 @@ type BindOtpMail struct {
 
 var (
 	// 老模板 OTP：优先找“验证码/OTP/verification code”附近的6位数字
-	reOTPNear = regexp.MustCompile(`(?i)(验证码|otp|verification\s*code)[^0-9]{0,40}(\d{6})`)
+	reOTPNear = regexp.MustCompile(`(?i)(验证码|otp|one[- ]time\s+password)[^0-9]{0,40}(\d{6})`)
 	// OTP：兜底找任意独立6位数字
 	reOTPAny = regexp.MustCompile(`\b(\d{6})\b`)
 
@@ -3909,7 +3909,7 @@ var (
 
 	// verification code is 404182
 	reVerificationCode = regexp.MustCompile(
-		`(?i)verification\s+code[^0-9]{0,50}(\d{6})`,
+		`(?i)verification\s+code.*?\bis\b[^0-9]{0,10}(\d{6})`,
 	)
 
 	// This code expires in 7 min.
@@ -3955,17 +3955,17 @@ func ParseBindOtpMail(subject, body string) BindOtpMail {
 	}
 
 	// 2) OTP
-	if m := reOTPNear.FindStringSubmatch(raw); len(m) >= 3 {
-
-		fmt.Println("命中 reOTPNear:", m[2])
-
-		out.OTP = m[2]
-
-	} else if m := reVerificationCode.FindStringSubmatch(raw); len(m) >= 2 {
+	if m := reVerificationCode.FindStringSubmatch(raw); len(m) >= 2 {
 
 		fmt.Println("命中 reVerificationCode:", m[1])
 
 		out.OTP = m[1]
+
+	} else if m := reOTPNear.FindStringSubmatch(raw); len(m) >= 3 {
+
+		fmt.Println("命中 reOTPNear:", m[2])
+
+		out.OTP = m[2]
 
 	} else {
 
