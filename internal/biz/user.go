@@ -3906,10 +3906,12 @@ var (
 // ParseBindOtpMail 从 subject+body 中解析：卡号(掩码/纯数字)、后四位、OTP、TTL分钟、正文时间
 // 老逻辑保留不动
 func ParseBindOtpMail(subject, body string) BindOtpMail {
+	fmt.Println("测试1 body：", subject, body)
 	raw := compactSpaces(subject + "\n" + body)
 	out := BindOtpMail{}
 
 	// 1) 卡号
+	fmt.Println("测试1：", raw)
 	if m := reCardMasked.FindStringSubmatch(raw); len(m) >= 2 {
 		out.CardMasked = normalizeMask(m[1])
 		out.CardLast4 = extractLast4(out.CardMasked)
@@ -3940,9 +3942,11 @@ func ParseBindOtpMail(subject, body string) BindOtpMail {
 
 // 新增：专门解析 Univision 钱包绑卡验证码邮件
 func ParseWalletActivationOtpMail(subject, body string) BindOtpMail {
+	fmt.Println("测试0 body：", subject, body)
 	raw := compactSpaces(subject + "\n" + body)
 	out := BindOtpMail{}
 
+	fmt.Println("测试0：", raw)
 	// 1) OTP
 	if m := reActivationCodeNear.FindStringSubmatch(raw); len(m) >= 2 {
 		out.OTP = m[1]
