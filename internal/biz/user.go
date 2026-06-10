@@ -3901,6 +3901,22 @@ var (
 	reBr          = regexp.MustCompile(`(?is)<br\s*/?>`)
 	rePclose      = regexp.MustCompile(`(?is)</p>`)
 	reTag         = regexp.MustCompile(`(?is)<[^>]+>`)
+
+	// Interlace 新模板
+	// card ending 49387519xxxxxx9713
+	reCardEnding = regexp.MustCompile(
+		`(?i)card\s+ending\s+([0-9]{6,12}[xX\*]{2,12}[0-9]{2,6})`,
+	)
+
+	// verification code is 404182
+	reVerificationCode = regexp.MustCompile(
+		`(?i)verification\s+code[^0-9]{0,40}(\d{6})`,
+	)
+
+	// This code expires in 7 min.
+	reCodeExpiresEN = regexp.MustCompile(
+		`(?i)this\s+code\s+expires\s+in\s+(\d{1,3})\s*(?:min|mins|minute|minutes)\b`,
+	)
 )
 
 // ParseBindOtpMail 从 subject+body 中解析：卡号(掩码/纯数字)、后四位、OTP、TTL分钟、正文时间
@@ -3911,24 +3927,38 @@ func ParseBindOtpMail(subject, body string) BindOtpMail {
 	out := BindOtpMail{}
 
 	// 1) 卡号
-	fmt.Println("测试1：", raw)
 	if m := reCardMasked.FindStringSubmatch(raw); len(m) >= 2 {
+
 		out.CardMasked = normalizeMask(m[1])
 		out.CardLast4 = extractLast4(out.CardMasked)
+
+	} else if m := reCardEnding.FindStringSubmatch(raw); len(m) >= 2 {
+
+		out.CardMasked = normalizeMask(m[1])
+		out.CardLast4 = extractLast4(out.CardMasked)
+
 	} else if m := reCardDigits.FindStringSubmatch(raw); len(m) >= 2 {
+
 		out.CardDigits = m[1]
 		out.CardLast4 = extractLast4(out.CardDigits)
 	}
 
 	// 2) OTP
+	// 2) OTP
 	if m := reOTPNear.FindStringSubmatch(raw); len(m) >= 3 {
 		out.OTP = m[2]
+	} else if m := reVerificationCode.FindStringSubmatch(raw); len(m) >= 2 {
+		out.OTP = m[1]
 	} else {
 		out.OTP = findAnyOTPExcludingCard(raw, out.CardMasked, out.CardDigits)
 	}
 
 	// 3) 中文有效期分钟
 	if m := reTTLMin.FindStringSubmatch(raw); len(m) >= 2 {
+		out.TTLMinutes = atoiSafe(m[1])
+	} else if m := reTTLMinEN.FindStringSubmatch(raw); len(m) >= 2 {
+		out.TTLMinutes = atoiSafe(m[1])
+	} else if m := reCodeExpiresEN.FindStringSubmatch(raw); len(m) >= 2 {
 		out.TTLMinutes = atoiSafe(m[1])
 	}
 
@@ -3942,11 +3972,9 @@ func ParseBindOtpMail(subject, body string) BindOtpMail {
 
 // 新增：专门解析 Univision 钱包绑卡验证码邮件
 func ParseWalletActivationOtpMail(subject, body string) BindOtpMail {
-	fmt.Println("测试0 body：", subject, body)
 	raw := compactSpaces(subject + "\n" + body)
 	out := BindOtpMail{}
 
-	fmt.Println("测试0：", raw)
 	// 1) OTP
 	if m := reActivationCodeNear.FindStringSubmatch(raw); len(m) >= 2 {
 		out.OTP = m[1]
