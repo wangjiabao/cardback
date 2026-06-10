@@ -3922,7 +3922,6 @@ var (
 // ParseBindOtpMail 从 subject+body 中解析：卡号(掩码/纯数字)、后四位、OTP、TTL分钟、正文时间
 // 老逻辑保留不动
 func ParseBindOtpMail(subject, body string) BindOtpMail {
-	fmt.Println("测试1 body：", subject, body)
 	raw := compactSpaces(subject + "\n" + body)
 	out := BindOtpMail{}
 
@@ -3967,6 +3966,7 @@ func ParseBindOtpMail(subject, body string) BindOtpMail {
 		out.MailTime = tm
 	}
 
+	fmt.Println("结果:", out)
 	return out
 }
 
