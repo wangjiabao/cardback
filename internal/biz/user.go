@@ -83,7 +83,7 @@ type User struct {
 	CardAmount       float64
 	Amount           float64
 	AmountTwo        uint64
-	MyTotalAmount    uint64
+	MyTotalAmount    float64
 	IsDelete         uint64
 	Vip              uint64
 	FirstName        string
@@ -313,39 +313,39 @@ func (uuc *UserUseCase) DepositNew(ctx context.Context, userId uint64, amount ui
 		return err
 	}
 
-	// 推荐人
-	var (
-		userRecommend       *UserRecommend
-		tmpRecommendUserIds []string
-	)
-	userRecommend, err = uuc.repo.GetUserRecommendByUserId(userId)
-	if nil != err {
-		return err
-	}
-	if "" != userRecommend.RecommendCode {
-		tmpRecommendUserIds = strings.Split(userRecommend.RecommendCode, "D")
-	}
-
-	totalTmp := len(tmpRecommendUserIds) - 1
-	for i := totalTmp; i >= 0; i-- {
-		tmpUserId, _ := strconv.ParseUint(tmpRecommendUserIds[i], 10, 64) // 最后一位是直推人
-		if 0 >= tmpUserId {
-			continue
-		}
-
-		// 增加业绩
-		if err = uuc.tx.ExecTx(ctx, func(ctx context.Context) error { // 事务
-			err = uuc.repo.UpdateUserMyTotalAmountAdd(ctx, tmpUserId, amount)
-			if err != nil {
-				return err
-			}
-
-			return nil
-		}); nil != err {
-			fmt.Println("遍历业绩：", err, tmpUserId, eth)
-			continue
-		}
-	}
+	//// 推荐人
+	//var (
+	//	userRecommend       *UserRecommend
+	//	tmpRecommendUserIds []string
+	//)
+	//userRecommend, err = uuc.repo.GetUserRecommendByUserId(userId)
+	//if nil != err {
+	//	return err
+	//}
+	//if "" != userRecommend.RecommendCode {
+	//	tmpRecommendUserIds = strings.Split(userRecommend.RecommendCode, "D")
+	//}
+	//
+	//totalTmp := len(tmpRecommendUserIds) - 1
+	//for i := totalTmp; i >= 0; i-- {
+	//	tmpUserId, _ := strconv.ParseUint(tmpRecommendUserIds[i], 10, 64) // 最后一位是直推人
+	//	if 0 >= tmpUserId {
+	//		continue
+	//	}
+	//
+	//	// 增加业绩
+	//	if err = uuc.tx.ExecTx(ctx, func(ctx context.Context) error { // 事务
+	//		err = uuc.repo.UpdateUserMyTotalAmountAdd(ctx, tmpUserId, amount)
+	//		if err != nil {
+	//			return err
+	//		}
+	//
+	//		return nil
+	//	}); nil != err {
+	//		fmt.Println("遍历业绩：", err, tmpUserId, eth)
+	//		continue
+	//	}
+	//}
 
 	return nil
 }
