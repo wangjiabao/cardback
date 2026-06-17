@@ -1272,7 +1272,7 @@ func (uuc *UserUseCase) AdminUserList(ctx context.Context, req *pb.AdminUserList
 			VipThree:           vUsers.VipThree,
 			MyRecommendAddress: addressMyRecommend,
 			HistoryRecommend:   lenUsers,
-			MyTotalAmount:      vUsers.MyTotalAmount,
+			MyTotalAmount:      uint64(vUsers.MyTotalAmount),
 			CardNumber:         vUsers.CardNumber,
 			CardTwoNumber:      vUsers.CardTwoNumber,
 			CardOrderId:        vUsers.CardOrderId,
