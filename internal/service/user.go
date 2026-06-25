@@ -330,6 +330,11 @@ func (u *UserService) AdminCardTwoList(ctx context.Context, req *pb.AdminCardTwo
 	return u.uuc.AdminCardTwoList(ctx, req)
 }
 
+// AdminCardTwoListNew 实体卡申请列表
+func (u *UserService) AdminCardTwoListNew(ctx context.Context, req *pb.AdminCardTwoRequest) (*pb.AdminCardTwoNewReply, error) {
+	return u.uuc.AdminCardTwoListNew(ctx, req)
+}
+
 // AdminUserBind  手动绑定虚拟卡，添加进绑定队列
 func (u *UserService) AdminUserBind(ctx context.Context, req *pb.AdminUserBindRequest) (*pb.AdminUserBindReply, error) {
 	return u.uuc.AdminUserBind(ctx, req)

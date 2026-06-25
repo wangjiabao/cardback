@@ -19,29 +19,30 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	User_OpenCardHandle_FullMethodName    = "/api.user.v1.User/OpenCardHandle"
-	User_CardStatusHandle_FullMethodName  = "/api.user.v1.User/CardStatusHandle"
-	User_Deposit_FullMethodName           = "/api.user.v1.User/Deposit"
-	User_AdminWithdrawEth_FullMethodName  = "/api.user.v1.User/AdminWithdrawEth"
-	User_RewardCardTwo_FullMethodName     = "/api.user.v1.User/RewardCardTwo"
-	User_AdminRewardList_FullMethodName   = "/api.user.v1.User/AdminRewardList"
-	User_AdminUserList_FullMethodName     = "/api.user.v1.User/AdminUserList"
-	User_AdminCardTwoList_FullMethodName  = "/api.user.v1.User/AdminCardTwoList"
-	User_AdminUserBind_FullMethodName     = "/api.user.v1.User/AdminUserBind"
-	User_AdminUserBindTwo_FullMethodName  = "/api.user.v1.User/AdminUserBindTwo"
-	User_AdminLogin_FullMethodName        = "/api.user.v1.User/AdminLogin"
-	User_UpdateUserInfoTo_FullMethodName  = "/api.user.v1.User/UpdateUserInfoTo"
-	User_UpdateCanVip_FullMethodName      = "/api.user.v1.User/UpdateCanVip"
-	User_SetVipThree_FullMethodName       = "/api.user.v1.User/SetVipThree"
-	User_SetUserCount_FullMethodName      = "/api.user.v1.User/SetUserCount"
-	User_AdminConfig_FullMethodName       = "/api.user.v1.User/AdminConfig"
-	User_AdminConfigUpdate_FullMethodName = "/api.user.v1.User/AdminConfigUpdate"
-	User_UpdateAllCard_FullMethodName     = "/api.user.v1.User/UpdateAllCard"
-	User_UpdateAllCardOne_FullMethodName  = "/api.user.v1.User/UpdateAllCardOne"
-	User_AllInfo_FullMethodName           = "/api.user.v1.User/AllInfo"
-	User_EmailGet_FullMethodName          = "/api.user.v1.User/EmailGet"
-	User_PullAllCard_FullMethodName       = "/api.user.v1.User/PullAllCard"
-	User_AutoUpdateAllCard_FullMethodName = "/api.user.v1.User/AutoUpdateAllCard"
+	User_OpenCardHandle_FullMethodName      = "/api.user.v1.User/OpenCardHandle"
+	User_CardStatusHandle_FullMethodName    = "/api.user.v1.User/CardStatusHandle"
+	User_Deposit_FullMethodName             = "/api.user.v1.User/Deposit"
+	User_AdminWithdrawEth_FullMethodName    = "/api.user.v1.User/AdminWithdrawEth"
+	User_RewardCardTwo_FullMethodName       = "/api.user.v1.User/RewardCardTwo"
+	User_AdminRewardList_FullMethodName     = "/api.user.v1.User/AdminRewardList"
+	User_AdminUserList_FullMethodName       = "/api.user.v1.User/AdminUserList"
+	User_AdminCardTwoList_FullMethodName    = "/api.user.v1.User/AdminCardTwoList"
+	User_AdminCardTwoListNew_FullMethodName = "/api.user.v1.User/AdminCardTwoListNew"
+	User_AdminUserBind_FullMethodName       = "/api.user.v1.User/AdminUserBind"
+	User_AdminUserBindTwo_FullMethodName    = "/api.user.v1.User/AdminUserBindTwo"
+	User_AdminLogin_FullMethodName          = "/api.user.v1.User/AdminLogin"
+	User_UpdateUserInfoTo_FullMethodName    = "/api.user.v1.User/UpdateUserInfoTo"
+	User_UpdateCanVip_FullMethodName        = "/api.user.v1.User/UpdateCanVip"
+	User_SetVipThree_FullMethodName         = "/api.user.v1.User/SetVipThree"
+	User_SetUserCount_FullMethodName        = "/api.user.v1.User/SetUserCount"
+	User_AdminConfig_FullMethodName         = "/api.user.v1.User/AdminConfig"
+	User_AdminConfigUpdate_FullMethodName   = "/api.user.v1.User/AdminConfigUpdate"
+	User_UpdateAllCard_FullMethodName       = "/api.user.v1.User/UpdateAllCard"
+	User_UpdateAllCardOne_FullMethodName    = "/api.user.v1.User/UpdateAllCardOne"
+	User_AllInfo_FullMethodName             = "/api.user.v1.User/AllInfo"
+	User_EmailGet_FullMethodName            = "/api.user.v1.User/EmailGet"
+	User_PullAllCard_FullMethodName         = "/api.user.v1.User/PullAllCard"
+	User_AutoUpdateAllCard_FullMethodName   = "/api.user.v1.User/AutoUpdateAllCard"
 )
 
 // UserClient is the client API for User service.
@@ -61,6 +62,7 @@ type UserClient interface {
 	AdminRewardList(ctx context.Context, in *AdminRewardListRequest, opts ...grpc.CallOption) (*AdminRewardListReply, error)
 	AdminUserList(ctx context.Context, in *AdminUserListRequest, opts ...grpc.CallOption) (*AdminUserListReply, error)
 	AdminCardTwoList(ctx context.Context, in *AdminCardTwoRequest, opts ...grpc.CallOption) (*AdminCardTwoReply, error)
+	AdminCardTwoListNew(ctx context.Context, in *AdminCardTwoRequest, opts ...grpc.CallOption) (*AdminCardTwoNewReply, error)
 	// 虚拟卡手动绑定，进处理队列
 	AdminUserBind(ctx context.Context, in *AdminUserBindRequest, opts ...grpc.CallOption) (*AdminUserBindReply, error)
 	// 实体卡手动绑定，进处理队列
@@ -158,6 +160,15 @@ func (c *userClient) AdminUserList(ctx context.Context, in *AdminUserListRequest
 func (c *userClient) AdminCardTwoList(ctx context.Context, in *AdminCardTwoRequest, opts ...grpc.CallOption) (*AdminCardTwoReply, error) {
 	out := new(AdminCardTwoReply)
 	err := c.cc.Invoke(ctx, User_AdminCardTwoList_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *userClient) AdminCardTwoListNew(ctx context.Context, in *AdminCardTwoRequest, opts ...grpc.CallOption) (*AdminCardTwoNewReply, error) {
+	out := new(AdminCardTwoNewReply)
+	err := c.cc.Invoke(ctx, User_AdminCardTwoListNew_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -316,6 +327,7 @@ type UserServer interface {
 	AdminRewardList(context.Context, *AdminRewardListRequest) (*AdminRewardListReply, error)
 	AdminUserList(context.Context, *AdminUserListRequest) (*AdminUserListReply, error)
 	AdminCardTwoList(context.Context, *AdminCardTwoRequest) (*AdminCardTwoReply, error)
+	AdminCardTwoListNew(context.Context, *AdminCardTwoRequest) (*AdminCardTwoNewReply, error)
 	// 虚拟卡手动绑定，进处理队列
 	AdminUserBind(context.Context, *AdminUserBindRequest) (*AdminUserBindReply, error)
 	// 实体卡手动绑定，进处理队列
@@ -367,6 +379,9 @@ func (UnimplementedUserServer) AdminUserList(context.Context, *AdminUserListRequ
 }
 func (UnimplementedUserServer) AdminCardTwoList(context.Context, *AdminCardTwoRequest) (*AdminCardTwoReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AdminCardTwoList not implemented")
+}
+func (UnimplementedUserServer) AdminCardTwoListNew(context.Context, *AdminCardTwoRequest) (*AdminCardTwoNewReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AdminCardTwoListNew not implemented")
 }
 func (UnimplementedUserServer) AdminUserBind(context.Context, *AdminUserBindRequest) (*AdminUserBindReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method AdminUserBind not implemented")
@@ -566,6 +581,24 @@ func _User_AdminCardTwoList_Handler(srv interface{}, ctx context.Context, dec fu
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(UserServer).AdminCardTwoList(ctx, req.(*AdminCardTwoRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _User_AdminCardTwoListNew_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AdminCardTwoRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UserServer).AdminCardTwoListNew(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: User_AdminCardTwoListNew_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UserServer).AdminCardTwoListNew(ctx, req.(*AdminCardTwoRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -878,6 +911,10 @@ var User_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "AdminCardTwoList",
 			Handler:    _User_AdminCardTwoList_Handler,
+		},
+		{
+			MethodName: "AdminCardTwoListNew",
+			Handler:    _User_AdminCardTwoListNew_Handler,
 		},
 		{
 			MethodName: "AdminUserBind",

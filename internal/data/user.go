@@ -78,6 +78,31 @@ type CardTwo struct {
 	Gender           string    `gorm:"type:varchar(45);not null;default:'no'"`
 }
 
+type CardTwoNew struct {
+	ID               uint64    `gorm:"primarykey;type:int"`
+	UserId           uint64    `gorm:"type:int;not null"`
+	FirstName        string    `gorm:"type:varchar(45);not null;default:'no'"`
+	LastName         string    `gorm:"type:varchar(45);not null;default:'no'"`
+	Email            string    `gorm:"type:varchar(100);not null;default:'no'"`
+	CountryCode      string    `gorm:"type:varchar(45);not null;default:'no'"`
+	Phone            string    `gorm:"type:varchar(45);not null;default:'no'"`
+	City             string    `gorm:"type:varchar(100);not null;default:'no'"`
+	Country          string    `gorm:"type:varchar(100);not null;default:'no'"`
+	Street           string    `gorm:"type:varchar(100);not null;default:'no'"`
+	PostalCode       string    `gorm:"type:varchar(45);not null;default:'no'"`
+	BirthDate        string    `gorm:"type:varchar(45);not null;default:'no'"`
+	PhoneCountryCode string    `gorm:"type:varchar(45);not null;default:'no'"`
+	State            string    `gorm:"type:varchar(45);not null;default:'no'"`
+	Status           uint64    `gorm:"type:int"`
+	Num              uint64    `gorm:"type:int"`
+	CardId           string    `gorm:"type:varchar(100);not null;default:'no'"`
+	CardAmount       float64   `gorm:"type:decimal(65,20);not null"`
+	CreatedAt        time.Time `gorm:"type:datetime;not null"`
+	UpdatedAt        time.Time `gorm:"type:datetime;not null"`
+	IdCard           string    `gorm:"type:varchar(45);not null;default:'no'"`
+	Gender           string    `gorm:"type:varchar(45);not null;default:'no'"`
+}
+
 type Admin struct {
 	ID       int64  `gorm:"primarykey;type:int"`
 	Account  string `gorm:"type:varchar(100);not null"`
@@ -2102,6 +2127,74 @@ func (u *UserRepo) GetCardTwos(b *biz.Pagination, userId uint64, status uint64, 
 			UpdatedAt:        c.UpdatedAt,
 			IdCard:           c.IdCard,
 			Gender:           c.Gender,
+		})
+	}
+
+	return res, nil, count
+}
+
+// GetCardTwosNew .
+// 分页查询实体卡用户信息（card_two_new 表）
+func (u *UserRepo) GetCardTwosNew(b *biz.Pagination, userId uint64, status uint64, cardId string) ([]*biz.CardTwoNew, error, int64) {
+	var (
+		cardTwos []*CardTwoNew
+		count    int64
+	)
+
+	// 基础查询
+	instance := u.data.db.Table("card_two_new")
+
+	if userId > 0 {
+		instance = instance.Where("user_id = ?", userId)
+	}
+
+	instance = instance.Where("status = ?", status)
+
+	if cardId != "" {
+		instance = instance.Where("card_id = ?", cardId)
+	}
+
+	// 统计总数
+	instance = instance.Count(&count)
+
+	// 分页 + 排序
+	if err := instance.Scopes(Paginate(b.PageNum, b.PageSize)).
+		Order("id desc").
+		Find(&cardTwos).Error; err != nil {
+
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.NotFound("CARD_TWO_NOT_FOUND", "card_two not found"), 0
+		}
+
+		return nil, errors.New(500, "CARD_TWO_ERROR", err.Error()), 0
+	}
+
+	// 转成 biz 层对象
+	res := make([]*biz.CardTwoNew, 0, len(cardTwos))
+	for _, c := range cardTwos {
+		res = append(res, &biz.CardTwoNew{
+			ID:               c.ID,
+			UserId:           c.UserId,
+			FirstName:        c.FirstName,
+			LastName:         c.LastName,
+			Email:            c.Email,
+			CountryCode:      c.CountryCode,
+			Phone:            c.Phone,
+			City:             c.City,
+			Country:          c.Country,
+			Street:           c.Street,
+			PostalCode:       c.PostalCode,
+			BirthDate:        c.BirthDate,
+			PhoneCountryCode: c.PhoneCountryCode,
+			State:            c.State,
+			Status:           c.Status,
+			CardId:           c.CardId,
+			CardAmount:       c.CardAmount,
+			CreatedAt:        c.CreatedAt,
+			UpdatedAt:        c.UpdatedAt,
+			IdCard:           c.IdCard,
+			Gender:           c.Gender,
+			Num:              c.Num,
 		})
 	}
 

@@ -64,6 +64,31 @@ type CardTwo struct {
 	UpdatedAt        time.Time
 }
 
+type CardTwoNew struct {
+	ID               uint64
+	UserId           uint64
+	FirstName        string
+	LastName         string
+	Email            string
+	CountryCode      string
+	Phone            string
+	City             string
+	Country          string
+	Street           string
+	PostalCode       string
+	BirthDate        string
+	PhoneCountryCode string
+	State            string
+	Status           uint64
+	Num              uint64
+	CardId           string
+	CardAmount       float64
+	IdCard           string
+	Gender           string
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+}
+
 type CardOrder struct {
 	ID        uint64
 	Last      uint64
@@ -251,6 +276,7 @@ type UserRepo interface {
 	UpdateUserDoing(ctx context.Context, userId uint64, cardNumber, cardNumberRel string, cardAmount float64) error
 	UpdateCardStatus(ctx context.Context, id, userId uint64, cardNumber, cardNumberRel string, cardAmount float64) error
 	GetCardTwos(b *Pagination, userId uint64, status uint64, cardId string) ([]*CardTwo, error, int64)
+	GetCardTwosNew(b *Pagination, userId uint64, status uint64, cardId string) ([]*CardTwoNew, error, int64)
 	GetCardTwoById(id uint64) (*CardTwo, error)
 	GetCardOrder() (*CardOrder, error)
 	CreateCardOrder(ctx context.Context, in *CardOrder) error
@@ -1348,6 +1374,90 @@ func (uuc *UserUseCase) AdminUserBindTwo(ctx context.Context, req *pb.AdminUserB
 	}
 
 	return nil, nil
+}
+
+func (uuc *UserUseCase) AdminCardTwoListNew(ctx context.Context, req *pb.AdminCardTwoRequest) (*pb.AdminCardTwoNewReply, error) {
+	var (
+		cards     []*CardTwoNew
+		userIds   []uint64
+		usersMap  map[uint64]*User
+		count     int64
+		err       error
+		tmpUserId uint64
+		sUser     *User
+	)
+
+	res := &pb.AdminCardTwoNewReply{
+		Users: make([]*pb.AdminCardTwoNewReply_EntityCardUser, 0),
+	}
+
+	if 0 < len(req.Address) {
+		sUser, err = uuc.repo.GetUserByAddress(req.Address)
+		if nil != err || nil == sUser {
+			return res, nil
+		}
+
+		tmpUserId = sUser.ID
+	}
+
+	cards, err, count = uuc.repo.GetCardTwosNew(&Pagination{
+		PageNum:  int(req.Page),
+		PageSize: 10,
+	}, tmpUserId, req.Status, "")
+	if nil != err {
+		return res, nil
+	}
+	res.Count = count
+
+	if len(cards) < 0 {
+		return res, nil
+	}
+
+	userIds = make([]uint64, 0)
+	for _, vUsers := range cards {
+		userIds = append(userIds, vUsers.UserId)
+	}
+
+	usersMap, err = uuc.repo.GetUserByUserIdsTwo(userIds)
+	if nil != err {
+		return res, nil
+	}
+
+	for _, vUsers := range cards {
+		addressTmp := ""
+		cardNumberRelTwo := ""
+		if _, ok := usersMap[vUsers.UserId]; ok {
+			addressTmp = usersMap[vUsers.UserId].Address
+			cardNumberRelTwo = usersMap[vUsers.UserId].CardNumberRelTwo
+		}
+
+		res.Users = append(res.Users, &pb.AdminCardTwoNewReply_EntityCardUser{
+			Id:               vUsers.ID,
+			UserId:           vUsers.UserId,
+			Address:          addressTmp,
+			CreatedAt:        vUsers.CreatedAt.Add(8 * time.Hour).Format("2006-01-02 15:04:05"),
+			FirstName:        vUsers.FirstName,
+			LastName:         vUsers.LastName,
+			Email:            vUsers.Email,
+			CountryCode:      vUsers.CountryCode,
+			Phone:            vUsers.Phone,
+			City:             vUsers.City,
+			Country:          vUsers.Country,
+			Street:           vUsers.Street,
+			PostalCode:       vUsers.PostalCode,
+			State:            vUsers.State,
+			BirthDate:        vUsers.BirthDate,
+			PhoneCountryCode: vUsers.PhoneCountryCode,
+			CardId:           vUsers.CardId,
+			Status:           vUsers.Status,
+			IdCard:           vUsers.IdCard,
+			Gender:           vUsers.Gender,
+			CardNumberRelTwo: cardNumberRelTwo,
+			Num:              vUsers.Num,
+		})
+	}
+
+	return res, nil
 }
 
 func (uuc *UserUseCase) AdminCardTwoList(ctx context.Context, req *pb.AdminCardTwoRequest) (*pb.AdminCardTwoReply, error) {

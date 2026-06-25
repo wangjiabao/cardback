@@ -20,6 +20,7 @@ var _ = binding.EncodeURL
 const _ = http.SupportPackageIsVersion1
 
 const OperationUserAdminCardTwoList = "/api.user.v1.User/AdminCardTwoList"
+const OperationUserAdminCardTwoListNew = "/api.user.v1.User/AdminCardTwoListNew"
 const OperationUserAdminConfig = "/api.user.v1.User/AdminConfig"
 const OperationUserAdminConfigUpdate = "/api.user.v1.User/AdminConfigUpdate"
 const OperationUserAdminLogin = "/api.user.v1.User/AdminLogin"
@@ -45,6 +46,7 @@ const OperationUserUpdateUserInfoTo = "/api.user.v1.User/UpdateUserInfoTo"
 
 type UserHTTPServer interface {
 	AdminCardTwoList(context.Context, *AdminCardTwoRequest) (*AdminCardTwoReply, error)
+	AdminCardTwoListNew(context.Context, *AdminCardTwoRequest) (*AdminCardTwoNewReply, error)
 	AdminConfig(context.Context, *AdminConfigRequest) (*AdminConfigReply, error)
 	AdminConfigUpdate(context.Context, *AdminConfigUpdateRequest) (*AdminConfigUpdateReply, error)
 	AdminLogin(context.Context, *AdminLoginRequest) (*AdminLoginReply, error)
@@ -90,6 +92,7 @@ func RegisterUserHTTPServer(s *http.Server, srv UserHTTPServer) {
 	r.GET("/api/admin_dhb/reward_list", _User_AdminRewardList0_HTTP_Handler(srv))
 	r.GET("/api/admin_dhb/user_list", _User_AdminUserList0_HTTP_Handler(srv))
 	r.GET("/api/admin_dhb/card_two_list", _User_AdminCardTwoList0_HTTP_Handler(srv))
+	r.GET("/api/admin_dhb/card_two_list_new", _User_AdminCardTwoListNew0_HTTP_Handler(srv))
 	r.POST("/api/admin_dhb/admin_user_bind", _User_AdminUserBind0_HTTP_Handler(srv))
 	r.POST("/api/admin_dhb/admin_user_bind_two", _User_AdminUserBindTwo0_HTTP_Handler(srv))
 	r.POST("/api/admin_dhb/login", _User_AdminLogin0_HTTP_Handler(srv))
@@ -255,6 +258,25 @@ func _User_AdminCardTwoList0_HTTP_Handler(srv UserHTTPServer) func(ctx http.Cont
 			return err
 		}
 		reply := out.(*AdminCardTwoReply)
+		return ctx.Result(200, reply)
+	}
+}
+
+func _User_AdminCardTwoListNew0_HTTP_Handler(srv UserHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in AdminCardTwoRequest
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationUserAdminCardTwoListNew)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.AdminCardTwoListNew(ctx, req.(*AdminCardTwoRequest))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*AdminCardTwoNewReply)
 		return ctx.Result(200, reply)
 	}
 }
@@ -570,6 +592,7 @@ func _User_AutoUpdateAllCard0_HTTP_Handler(srv UserHTTPServer) func(ctx http.Con
 
 type UserHTTPClient interface {
 	AdminCardTwoList(ctx context.Context, req *AdminCardTwoRequest, opts ...http.CallOption) (rsp *AdminCardTwoReply, err error)
+	AdminCardTwoListNew(ctx context.Context, req *AdminCardTwoRequest, opts ...http.CallOption) (rsp *AdminCardTwoNewReply, err error)
 	AdminConfig(ctx context.Context, req *AdminConfigRequest, opts ...http.CallOption) (rsp *AdminConfigReply, err error)
 	AdminConfigUpdate(ctx context.Context, req *AdminConfigUpdateRequest, opts ...http.CallOption) (rsp *AdminConfigUpdateReply, err error)
 	AdminLogin(ctx context.Context, req *AdminLoginRequest, opts ...http.CallOption) (rsp *AdminLoginReply, err error)
@@ -607,6 +630,19 @@ func (c *UserHTTPClientImpl) AdminCardTwoList(ctx context.Context, in *AdminCard
 	pattern := "/api/admin_dhb/card_two_list"
 	path := binding.EncodeURL(pattern, in, true)
 	opts = append(opts, http.Operation(OperationUserAdminCardTwoList))
+	opts = append(opts, http.PathTemplate(pattern))
+	err := c.cc.Invoke(ctx, "GET", path, nil, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, err
+}
+
+func (c *UserHTTPClientImpl) AdminCardTwoListNew(ctx context.Context, in *AdminCardTwoRequest, opts ...http.CallOption) (*AdminCardTwoNewReply, error) {
+	var out AdminCardTwoNewReply
+	pattern := "/api/admin_dhb/card_two_list_new"
+	path := binding.EncodeURL(pattern, in, true)
+	opts = append(opts, http.Operation(OperationUserAdminCardTwoListNew))
 	opts = append(opts, http.PathTemplate(pattern))
 	err := c.cc.Invoke(ctx, "GET", path, nil, &out, opts...)
 	if err != nil {
